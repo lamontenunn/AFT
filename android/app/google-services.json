@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "109820847091",
+    "project_id": "aft-firebase-app-1760071390",
+    "storage_bucket": "aft-firebase-app-1760071390.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:109820847091:android:e992649ee0b026bc65a886",
+        "android_client_info": {
+          "package_name": "com.example.aft_firebase_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0CzPojuDi5_5eEkzNHANg89S7oQgi3Ew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
