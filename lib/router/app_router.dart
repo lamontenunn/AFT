@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:aft_firebase_app/shell/aft_scaffold.dart';
-import 'package:aft_firebase_app/screens/home_screen.dart';
+import 'package:aft_firebase_app/features/home/home_screen.dart';
 import 'package:aft_firebase_app/screens/standards_screen.dart';
 
 class Routes {
@@ -14,7 +14,7 @@ class AppRouter {
       case Routes.home:
         return MaterialPageRoute(
           settings: settings,
-          builder: (context) => const AftScaffold(child: HomeScreen()),
+          builder: (context) => const AftScaffold(child: FeatureHomeScreen()),
         );
       case Routes.standards:
         return MaterialPageRoute(
