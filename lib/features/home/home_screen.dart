@@ -8,6 +8,9 @@ import 'package:aft_firebase_app/widgets/aft_event_card.dart';
 import 'package:aft_firebase_app/widgets/aft_score_ring.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
+import 'package:aft_firebase_app/features/auth/providers.dart';
+import 'package:aft_firebase_app/data/repository_providers.dart';
+import 'package:aft_firebase_app/data/aft_repository.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline)
@@ -102,6 +105,8 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
 
     final profile = ref.watch(aftProfileProvider);
     final computed = ref.watch(aftComputedProvider);
+    final auth = ref.watch(authStateProvider);
+    final bool canSave = auth.isSignedIn && computed.total != null;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
@@ -137,6 +142,36 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                         fontWeight: FontWeight.w700,
                         color: cs.onSurface,
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: auth.isSignedIn ? 'Save results' : 'Sign in to save results',
+                    preferBelow: false,
+                    child: FilledButton.icon(
+                      onPressed: canSave
+                          ? () async {
+                              final profileNow = ref.read(aftProfileProvider);
+                              final inputsNow = ref.read(aftInputsProvider);
+                              final computedNow = ref.read(aftComputedProvider);
+                              final repo = ref.read(aftRepositoryProvider);
+                              final userId = ref.read(authStateProvider).userId!;
+                              final set = ScoreSet(
+                                profile: profileNow,
+                                inputs: inputsNow,
+                                computed: computedNow,
+                                createdAt: DateTime.now(),
+                              );
+                              await repo.saveScoreSet(userId: userId, set: set);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Saved')),
+                                );
+                              }
+                            }
+                          : null,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Save'),
                     ),
                   ),
                 ],
