@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:aft_firebase_app/state/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
+import 'package:aft_firebase_app/features/aft/state/providers.dart';
 
 /// App shell with a collapsing AppBar, segmented control, and overflow sheet.
 /// - Title: "AFT Calculator"
 /// - Right actions: SegmentedButton for General | Combat, overflow menu
 /// - Collapses on scroll and keeps a small "Total" chip placeholder.
-class AftScaffold extends StatelessWidget {
+class AftScaffold extends ConsumerWidget {
   const AftScaffold({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -22,11 +24,11 @@ class AftScaffold extends StatelessWidget {
             SliverAppBar.large(
               pinned: true,
               title: const Text('AFT Calculator'),
-              actions: const [
-                _DomainSegmentedControl(),
-                SizedBox(width: 8),
-                _OverflowButton(),
-                SizedBox(width: 8),
+              actions: [
+                const _DomainSegmentedControl(),
+                const SizedBox(width: 8),
+                const _OverflowButton(),
+                const SizedBox(width: 8),
               ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(36),
@@ -41,7 +43,7 @@ class AftScaffold extends StatelessWidget {
                         color: colorScheme.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
-                      backgroundColor: colorScheme.surfaceVariant.withOpacity(0.3),
+                      backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
                       side: BorderSide(color: colorScheme.outline, width: 0.8),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -57,17 +59,17 @@ class AftScaffold extends StatelessWidget {
   }
 }
 
-class _DomainSegmentedControl extends StatelessWidget {
+class _DomainSegmentedControl extends ConsumerWidget {
   const _DomainSegmentedControl();
 
   @override
-  Widget build(BuildContext context) {
-    final appState = AppStateScope.of(context);
-    final selected = <Domain>{appState.domain};
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(aftProfileProvider);
+    final selected = <AftStandard>{profile.standard};
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: SegmentedButton<Domain>(
+      child: SegmentedButton<AftStandard>(
         style: ButtonStyle(
           visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
           side: WidgetStatePropertyAll(
@@ -76,11 +78,11 @@ class _DomainSegmentedControl extends StatelessWidget {
         ),
         segments: const [
           ButtonSegment(
-            value: Domain.general,
+            value: AftStandard.general,
             label: Text('General'),
           ),
           ButtonSegment(
-            value: Domain.combat,
+            value: AftStandard.combat,
             label: Text('Combat'),
           ),
         ],
@@ -88,7 +90,7 @@ class _DomainSegmentedControl extends StatelessWidget {
         onSelectionChanged: (newSelection) {
           if (newSelection.isEmpty) return;
           final value = newSelection.first;
-          AppStateScope.read(context).setDomain(value);
+          ref.read(aftProfileProvider.notifier).setStandard(value);
         },
       ),
     );
