@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:aft_firebase_app/shell/aft_scaffold.dart';
 import 'package:aft_firebase_app/features/home/home_screen.dart';
 import 'package:aft_firebase_app/screens/standards_screen.dart';
+import 'package:aft_firebase_app/features/saves/saved_sets_screen.dart';
 
 class Routes {
   static const String home = '/';
   static const String standards = '/standards';
+  static const String savedSets = '/saved-sets';
 }
 
 class AppRouter {
@@ -20,6 +22,11 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (context) => const StandardsScreen(),
+        );
+      case Routes.savedSets:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (context) => const SavedSetsScreen(),
         );
       default:
         return MaterialPageRoute(

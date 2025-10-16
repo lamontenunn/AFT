@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
+import 'package:aft_firebase_app/features/auth/auth_state.dart';
+import 'package:aft_firebase_app/features/auth/providers.dart';
 
 /// App shell with a collapsing AppBar, segmented control, and overflow sheet.
 /// - Title: "AFT Calculator"
@@ -26,6 +28,8 @@ class AftScaffold extends ConsumerWidget {
               title: const Text('AFT Calculator'),
               actions: [
                 const _DomainSegmentedControl(),
+                const SizedBox(width: 8),
+                const _ProfileButton(),
                 const SizedBox(width: 8),
                 const _OverflowButton(),
                 const SizedBox(width: 8),
@@ -93,6 +97,106 @@ class _DomainSegmentedControl extends ConsumerWidget {
           ref.read(aftProfileProvider.notifier).setStandard(value);
         },
       ),
+    );
+  }
+}
+
+class _ProfileButton extends ConsumerWidget {
+  const _ProfileButton();
+
+  String _initialsFor(AuthState state) {
+    final name = state.displayName?.trim();
+    if (name != null && name.isNotEmpty) {
+      final parts = name.split(' ').where((e) => e.isNotEmpty).toList();
+      final first = parts.isNotEmpty ? parts.first[0] : '';
+      final last = parts.length > 1 ? parts.last[0] : '';
+      final init = (first + last).toUpperCase();
+      return init.isEmpty ? 'U' : init;
+    }
+    final id = state.userId ?? '';
+    return id.isNotEmpty ? id[0].toUpperCase() : 'U';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authStateProvider);
+
+    return IconButton(
+      tooltip: auth.isSignedIn ? 'Account' : 'Sign in to save scores',
+      icon: auth.isSignedIn
+          ? CircleAvatar(
+              radius: 12,
+              child: Text(
+                _initialsFor(auth),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            )
+          : const Icon(Icons.person_outline),
+      onPressed: () => _showProfileSheet(context, ref, auth),
+    );
+  }
+
+  void _showProfileSheet(BuildContext context, WidgetRef ref, AuthState auth) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) {
+        if (!auth.isSignedIn) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('Sign in to save scores'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.login),
+                  title: const Text('Sign in'),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await ref.read(authActionsProvider).signIn();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Signed in as Demo User')),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        } else {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.folder_outlined),
+                  title: const Text('Saved sets'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pushNamed('/saved-sets');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Sign out'),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await ref.read(authActionsProvider).signOut();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Signed out')),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        }
+      },
     );
   }
 }
