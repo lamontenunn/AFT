@@ -6,16 +6,18 @@ import 'package:aft_firebase_app/widgets/aft_pill.dart';
 import 'package:aft_firebase_app/widgets/aft_choice_chip.dart';
 import 'package:aft_firebase_app/widgets/aft_event_card.dart';
 import 'package:aft_firebase_app/widgets/aft_score_ring.dart';
+import 'package:aft_firebase_app/widgets/aft_stepper.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/data/aft_repository.dart';
+import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
 
 /// Home screen layout (first page) using Riverpod state.
-/// - Total card with right-side pass/fail box (gold outline)
+/// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
 /// - Context row card: Age dropdown; Sex chips; Test Date pill (no picker)
-/// - Event cards: MDL, HR Push-ups, Sprint-Drag-Carry (with inputs)
+/// - Event cards: MDL, HR Push-ups, Sprint-Drag-Carry (with inputs + steppers)
 /// Score rings and total are computed via providers + scoring service.
 class FeatureHomeScreen extends ConsumerStatefulWidget {
   const FeatureHomeScreen({super.key});
@@ -29,15 +31,22 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
   final _mdlController = TextEditingController();
   final _puController = TextEditingController();
   final _sdcController = TextEditingController(); // mm:ss
+  final _plankController = TextEditingController(); // mm:ss
+  final _run2miController = TextEditingController(); // mm:ss
   String? _mdlError;
   String? _puError;
   String? _sdcError;
+  String? _plankError;
+  String? _run2miError;
+
 
   @override
   void dispose() {
     _mdlController.dispose();
     _puController.dispose();
     _sdcController.dispose();
+    _plankController.dispose();
+    _run2miController.dispose();
     super.dispose();
   }
 
@@ -79,7 +88,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
       ref.read(aftInputsProvider.notifier).setSdc(null);
       return;
     }
-    final dur = _parseMmSs(value);
+    final dur = parseMmSs(value);
     if (dur == null) {
       setState(() => _sdcError = 'Use mm:ss');
       ref.read(aftInputsProvider.notifier).setSdc(null);
@@ -89,13 +98,36 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     }
   }
 
-  Duration? _parseMmSs(String value) {
-    final parts = value.split(':');
-    if (parts.length != 2) return null;
-    final m = int.tryParse(parts[0]);
-    final s = int.tryParse(parts[1]);
-    if (m == null || s == null || m < 0 || s < 0 || s > 59) return null;
-    return Duration(minutes: m, seconds: s);
+  void _onPlankChanged(String value) {
+    if (value.isEmpty) {
+      setState(() => _plankError = null);
+      ref.read(aftInputsProvider.notifier).setPlank(null);
+      return;
+    }
+    final dur = parseMmSs(value);
+    if (dur == null) {
+      setState(() => _plankError = 'Use mm:ss');
+      ref.read(aftInputsProvider.notifier).setPlank(null);
+    } else {
+      setState(() => _plankError = null);
+      ref.read(aftInputsProvider.notifier).setPlank(dur);
+    }
+  }
+
+  void _onRunChanged(String value) {
+    if (value.isEmpty) {
+      setState(() => _run2miError = null);
+      ref.read(aftInputsProvider.notifier).setRun2mi(null);
+      return;
+    }
+    final dur = parseMmSs(value);
+    if (dur == null) {
+      setState(() => _run2miError = 'Use mm:ss');
+      ref.read(aftInputsProvider.notifier).setRun2mi(null);
+    } else {
+      setState(() => _run2miError = null);
+      ref.read(aftInputsProvider.notifier).setRun2mi(dur);
+    }
   }
 
   @override
@@ -105,12 +137,20 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
 
     final profile = ref.watch(aftProfileProvider);
     final computed = ref.watch(aftComputedProvider);
+    // Light haptic when total score transitions to a valid number.
+    ref.listen<AftComputed>(aftComputedProvider, (prev, next) {
+      if (next.total != null && next.total != prev?.total) {
+        HapticFeedback.lightImpact();
+      }
+    });
     final auth = ref.watch(authStateProvider);
     final bool canSave = auth.isSignedIn && computed.total != null;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
+
+
         const SizedBox(height: 12),
 
         // Total card
@@ -119,16 +159,24 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
           child: Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Text(
-                      computed.total == null ? 'Total: —' : 'Total: ${computed.total}',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                  Semantics(
+                      label: 'Total score',
+                      value: computed.total?.toString() ?? 'No total yet',
+                      child: Text(
+                        computed.total == null ? 'Total: —' : 'Total: ${computed.total}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: ShapeDecoration(
@@ -149,6 +197,10 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                     message: auth.isSignedIn ? 'Save results' : 'Sign in to save results',
                     preferBelow: false,
                     child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
                       onPressed: canSave
                           ? () async {
                               final profileNow = ref.read(aftProfileProvider);
@@ -189,7 +241,10 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Context', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Semantics(
+                    header: true,
+                    child: Text('Context', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  ),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 12,
@@ -274,16 +329,34 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
             children: [
               Text('Weight (lbs)', style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
-              TextField(
-                controller: _mdlController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                onChanged: _onMdlChanged,
-                decoration: InputDecoration(
-                  hintText: 'e.g., 185',
-                  errorText: _mdlError,
-                  suffixText: 'lbs',
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _mdlController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: _onMdlChanged,
+                      scrollPadding: const EdgeInsets.only(bottom: 80),
+                      decoration: InputDecoration(
+                        labelText: 'MDL weight',
+                        hintText: 'e.g., 185',
+                        errorText: _mdlError,
+                        suffixText: 'lbs',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AftStepper(
+                    value: int.tryParse(_mdlController.text) ?? 0,
+                    min: 0,
+                    step: 5,
+                    onChanged: (v) {
+                      _mdlController.text = '$v';
+                      _onMdlChanged(_mdlController.text);
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -299,15 +372,33 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
             children: [
               Text('Repetitions', style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
-              TextField(
-                controller: _puController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                onChanged: _onPuChanged,
-                decoration: InputDecoration(
-                  hintText: 'e.g., 30',
-                  errorText: _puError,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _puController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: _onPuChanged,
+                      scrollPadding: const EdgeInsets.only(bottom: 80),
+                      decoration: InputDecoration(
+                        labelText: 'Push-ups',
+                        hintText: 'e.g., 30',
+                        errorText: _puError,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AftStepper(
+                    value: int.tryParse(_puController.text) ?? 0,
+                    min: 0,
+                    step: 1,
+                    onChanged: (v) {
+                      _puController.text = '$v';
+                      _onPuChanged(_puController.text);
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -326,11 +417,65 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               TextField(
                 controller: _sdcController,
                 keyboardType: TextInputType.number,
-                inputFormatters: [_MmSsFormatter()],
+                inputFormatters: [MmSsFormatter()],
                 onChanged: _onSdcChanged,
+                scrollPadding: const EdgeInsets.only(bottom: 80),
                 decoration: InputDecoration(
+                  labelText: 'Sprint-Drag-Carry time',
                   hintText: 'e.g., 01:45',
                   errorText: _sdcError,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Plank card
+        AftEventCard(
+          title: 'Plank',
+          icon: Icons.access_time,
+          trailing: AftScoreRing(score: computed.plankScore),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Time (mm:ss)', style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _plankController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [MmSsFormatter()],
+                onChanged: _onPlankChanged,
+                scrollPadding: const EdgeInsets.only(bottom: 80),
+                decoration: InputDecoration(
+                  labelText: 'Plank time',
+                  hintText: 'e.g., 02:10',
+                  errorText: _plankError,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 2-Mile Run card
+        AftEventCard(
+          title: '2-Mile Run',
+          icon: Icons.directions_run,
+          trailing: AftScoreRing(score: computed.run2miScore),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Time (mm:ss)', style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _run2miController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [MmSsFormatter()],
+                onChanged: _onRunChanged,
+                scrollPadding: const EdgeInsets.only(bottom: 80),
+                decoration: InputDecoration(
+                  labelText: '2-Mile Run time',
+                  hintText: 'e.g., 16:45',
+                  errorText: _run2miError,
                 ),
               ),
             ],
@@ -346,31 +491,5 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     final mm = d.month.toString().padLeft(2, '0');
     final dd = d.day.toString().padLeft(2, '0');
     return '${d.year}-$mm-$dd';
-  }
-}
-
-/// Basic mm:ss input formatter.
-/// - Only digits are accepted; a colon is inserted after 2 digits
-/// - Limits length to 5 (mm:ss)
-class _MmSsFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    var text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (text.length > 4) text = text.substring(0, 4);
-
-    String formatted;
-    if (text.length <= 2) {
-      formatted = text;
-    } else {
-      formatted = '${text.substring(0, 2)}:${text.substring(2)}';
-    }
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
   }
 }
