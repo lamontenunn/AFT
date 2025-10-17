@@ -2,7 +2,7 @@ import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 
 /// AFT events supported in scoring.
-enum AftEvent { mdl, pushUps, sdc }
+enum AftEvent { mdl, pushUps, sdc, plank, run2mi }
 
 /// Seam for real AFT scoring tables (placeholder logic for now).
 class ScoringService {
@@ -31,6 +31,16 @@ class ScoringService {
         if (input is! Duration) return null;
         if (input.inMilliseconds < 0) return null;
         return 68;
+      case AftEvent.plank:
+        if (input is! Duration) return null;
+        if (input.inMilliseconds < 0) return null;
+        // Placeholder deterministic score for Plank
+        return 76;
+      case AftEvent.run2mi:
+        if (input is! Duration) return null;
+        if (input.inMilliseconds < 0) return null;
+        // Placeholder deterministic score for 2-Mile Run
+        return 62;
     }
   }
 

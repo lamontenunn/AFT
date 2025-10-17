@@ -31,10 +31,13 @@ class AftScoreRing extends StatelessWidget {
     final value = (score ?? 0).clamp(0, max);
     final target = max == 0 ? 0.0 : value / max;
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: TweenAnimationBuilder<double>(
+    return Semantics(
+      label: 'Score ring',
+      value: score == null ? 'No score' : '$value of $max',
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: TweenAnimationBuilder<double>(
         tween: Tween<double>(begin: 0, end: target.toDouble()),
         duration: duration,
         curve: Curves.easeOutCubic,
@@ -47,18 +50,24 @@ class AftScoreRing extends StatelessWidget {
               progressColor: ArmyColors.gold,
             ),
             child: Center(
-              child: Text(
-                score == null ? '—' : '$value',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface,
+              child: AnimatedSwitcher(
+                duration: duration,
+                transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                child: Text(
+                  score == null ? '—' : '$value',
+                  key: ValueKey(score ?? -1),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
                 ),
               ),
             ),
           );
         },
       ),
-    );
+    ),
+  );
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/auth_state.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
+import 'package:aft_firebase_app/theme/army_colors.dart';
 
 /// App shell with a collapsing AppBar, segmented control, and overflow sheet.
 /// - Title: "AFT Calculator"
@@ -23,41 +24,35 @@ class AftScaffold extends ConsumerWidget {
       body: NestedScrollView(
         headerSliverBuilder: (context, innerScrolled) {
           return [
-            SliverAppBar.large(
+            SliverAppBar(
               pinned: true,
-              title: const Text('AFT Calculator'),
+              centerTitle: true,
+              title: const Text(
+                'AFT Calculator',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               actions: [
-                const _DomainSegmentedControl(),
-                const SizedBox(width: 8),
                 const _ProfileButton(),
                 const SizedBox(width: 8),
                 const _OverflowButton(),
                 const SizedBox(width: 8),
               ],
               bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(36),
+                preferredSize: const Size.fromHeight(56),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Chip(
-                      label: const Text('Total'),
-                      visualDensity: VisualDensity.compact,
-                      labelStyle: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                      side: BorderSide(color: colorScheme.outline, width: 0.8),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                  child: Center(child: _DomainSegmentedControl()),
                 ),
               ),
             ),
           ];
         },
-        body: child,
+        body: SafeArea(
+          top: false,
+          bottom: true,
+          child: child,
+        ),
       ),
     );
   }
@@ -76,9 +71,13 @@ class _DomainSegmentedControl extends ConsumerWidget {
       child: SegmentedButton<AftStandard>(
         style: ButtonStyle(
           visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-          side: WidgetStatePropertyAll(
-            BorderSide(color: Theme.of(context).colorScheme.outline, width: 1),
-          ),
+          side: WidgetStateProperty.resolveWith((states) {
+            final outline = Theme.of(context).colorScheme.outline;
+            if (states.contains(WidgetState.focused)) {
+              return const BorderSide(color: ArmyColors.gold, width: 1.2);
+            }
+            return BorderSide(color: outline, width: 1);
+          }),
         ),
         segments: const [
           ButtonSegment(

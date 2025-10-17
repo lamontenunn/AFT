@@ -26,6 +26,8 @@ class InputsNotifier extends Notifier<AftInputs> {
   void setMdlLbs(int? lbs) => state = state.copyWith(mdlLbs: lbs);
   void setPushUps(int? reps) => state = state.copyWith(pushUps: reps);
   void setSdc(Duration? time) => state = state.copyWith(sdc: time);
+  void setPlank(Duration? time) => state = state.copyWith(plank: time);
+  void setRun2mi(Duration? time) => state = state.copyWith(run2mi: time);
 
   void clearAll() => state = const AftInputs();
 }
@@ -38,12 +40,16 @@ class AftComputed {
   final int? mdlScore;
   final int? pushUpsScore;
   final int? sdcScore;
+  final int? plankScore;
+  final int? run2miScore;
   final int? total;
 
   const AftComputed({
     required this.mdlScore,
     required this.pushUpsScore,
     required this.sdcScore,
+    required this.plankScore,
+    required this.run2miScore,
     required this.total,
   });
 }
@@ -71,6 +77,18 @@ final aftComputedProvider = Provider<AftComputed>((ref) {
     AftEvent.sdc,
     inputs.sdc,
   );
+  final plank = svc.scoreEvent(
+    profile.standard,
+    profile,
+    AftEvent.plank,
+    inputs.plank,
+  );
+  final run2mi = svc.scoreEvent(
+    profile.standard,
+    profile,
+    AftEvent.run2mi,
+    inputs.run2mi,
+  );
 
   final total = svc.totalScore(profile.standard, profile, mdl, pu, sdc);
 
@@ -78,6 +96,8 @@ final aftComputedProvider = Provider<AftComputed>((ref) {
     mdlScore: mdl,
     pushUpsScore: pu,
     sdcScore: sdc,
+    plankScore: plank,
+    run2miScore: run2mi,
     total: total,
   );
 });

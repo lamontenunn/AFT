@@ -23,14 +23,16 @@ class ScoreSet {
   Map<String, dynamic> toJson() => {
         'profile': {
           'age': profile.age,
-          'sex': describeEnum(profile.sex),
-          'standard': describeEnum(profile.standard),
+          'sex': profile.sex.name,
+          'standard': profile.standard.name,
           'testDate': profile.testDate?.toIso8601String(),
         },
         'inputs': {
           'mdlLbs': inputs.mdlLbs,
           'pushUps': inputs.pushUps,
           'sdc': inputs.sdc?.inSeconds,
+          'plank': inputs.plank?.inSeconds,
+          'run2mi': inputs.run2mi?.inSeconds,
         },
         'computed': computed == null
             ? null
@@ -38,6 +40,8 @@ class ScoreSet {
                 'mdlScore': computed!.mdlScore,
                 'pushUpsScore': computed!.pushUpsScore,
                 'sdcScore': computed!.sdcScore,
+                'plankScore': computed!.plankScore,
+                'run2miScore': computed!.run2miScore,
                 'total': computed!.total,
               },
         'createdAt': createdAt.toIso8601String(),
@@ -49,12 +53,12 @@ class ScoreSet {
     final comp = json['computed'] as Map<String, dynamic>?;
 
     final sex = AftSex.values.firstWhere(
-      (e) => describeEnum(e) == (prof['sex'] as String),
+      (e) => e.name == (prof['sex'] as String),
       orElse: () => AftSex.male,
     );
     final stdStr = prof['standard'] as String;
     final std = AftStandard.values.firstWhere(
-      (e) => describeEnum(e) == stdStr,
+      (e) => e.name == stdStr,
       orElse: () => AftStandard.general,
     );
 
@@ -73,6 +77,12 @@ class ScoreSet {
       sdc: (inp['sdc'] as int?) == null
           ? null
           : Duration(seconds: inp['sdc'] as int),
+      plank: (inp['plank'] as int?) == null
+          ? null
+          : Duration(seconds: inp['plank'] as int),
+      run2mi: (inp['run2mi'] as int?) == null
+          ? null
+          : Duration(seconds: inp['run2mi'] as int),
     );
 
     final computed = comp == null
@@ -81,6 +91,8 @@ class ScoreSet {
             mdlScore: comp['mdlScore'] as int?,
             pushUpsScore: comp['pushUpsScore'] as int?,
             sdcScore: comp['sdcScore'] as int?,
+            plankScore: comp['plankScore'] as int?,
+            run2miScore: comp['run2miScore'] as int?,
             total: comp['total'] as int?,
           );
 
