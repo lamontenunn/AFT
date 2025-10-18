@@ -90,7 +90,8 @@ final aftComputedProvider = Provider<AftComputed>((ref) {
     inputs.run2mi,
   );
 
-  final total = svc.totalScore(profile.standard, profile, mdl, pu, sdc);
+  final total =
+      svc.totalScore(profile.standard, profile, mdl, pu, sdc, plank, run2mi);
 
   return AftComputed(
     mdlScore: mdl,
