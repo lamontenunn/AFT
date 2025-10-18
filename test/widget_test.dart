@@ -3,11 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:aft_firebase_app/app.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   testWidgets('App renders with dark Army theme', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(const ProviderScope(child: App()));
     await tester.pumpAndSettle();
 
     // Basic structure exists
