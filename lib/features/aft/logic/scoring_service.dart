@@ -1,5 +1,6 @@
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
+import 'package:aft_firebase_app/features/aft/logic/data/mdl_table.dart';
 
 /// AFT events supported in scoring.
 enum AftEvent { mdl, pushUps, sdc, plank, run2mi }
@@ -22,7 +23,11 @@ class ScoringService {
       case AftEvent.mdl:
         if (input is! int) return null;
         if (input < 0) return null;
-        return 82;
+        // Combat uses male standards regardless of selected sex.
+        final effectiveSex =
+            standard == AftStandard.combat ? AftSex.male : profile.sex;
+        final pts = mdlPointsForSex(effectiveSex, profile.age, input);
+        return pts;
       case AftEvent.pushUps:
         if (input is! int) return null;
         if (input < 0) return null;
