@@ -1,6 +1,10 @@
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/logic/data/mdl_table.dart';
+import 'package:aft_firebase_app/features/aft/logic/data/hrp_table.dart';
+import 'package:aft_firebase_app/features/aft/logic/data/sdc_table.dart';
+import 'package:aft_firebase_app/features/aft/logic/data/plk_table.dart';
+import 'package:aft_firebase_app/features/aft/logic/data/run2mi_table.dart';
 
 /// AFT events supported in scoring.
 enum AftEvent { mdl, pushUps, sdc, plank, run2mi }
@@ -31,34 +35,51 @@ class ScoringService {
       case AftEvent.pushUps:
         if (input is! int) return null;
         if (input < 0) return null;
-        return 74;
+        // Combat uses male standards regardless of selected sex.
+        final effectiveSex =
+            standard == AftStandard.combat ? AftSex.male : profile.sex;
+        final pts = hrpPointsForSex(effectiveSex, profile.age, input);
+        return pts;
       case AftEvent.sdc:
         if (input is! Duration) return null;
         if (input.inMilliseconds < 0) return null;
-        return 68;
+        // Combat uses male standards regardless of selected sex.
+        final effectiveSex =
+            standard == AftStandard.combat ? AftSex.male : profile.sex;
+        final pts = sdcPointsForSex(effectiveSex, profile.age, input);
+        return pts;
       case AftEvent.plank:
         if (input is! Duration) return null;
         if (input.inMilliseconds < 0) return null;
-        // Placeholder deterministic score for Plank
-        return 76;
+        // Combat uses male standards regardless of selected sex.
+        final effectiveSex =
+            standard == AftStandard.combat ? AftSex.male : profile.sex;
+        final pts = plkPointsForSex(effectiveSex, profile.age, input);
+        return pts;
       case AftEvent.run2mi:
         if (input is! Duration) return null;
         if (input.inMilliseconds < 0) return null;
-        // Placeholder deterministic score for 2-Mile Run
-        return 62;
+        // Combat uses male standards regardless of selected sex.
+        final effectiveSex =
+            standard == AftStandard.combat ? AftSex.male : profile.sex;
+        final pts = run2miPointsForSex(effectiveSex, profile.age, input);
+        return pts;
     }
   }
 
-  /// Sums event scores when all required events are present; otherwise null.
+  /// Returns a live total that updates dynamically:
+  /// - Missing/null event scores are treated as 0 (partial totals are allowed).
   int? totalScore(
     AftStandard standard,
     AftProfile profile,
     int? mdl,
     int? pushUps,
     int? sdc,
+    int? plank,
+    int? run2mi,
   ) {
-    if (mdl == null || pushUps == null || sdc == null) return null;
-    final total = mdl + pushUps + sdc;
+    final total =
+        (mdl ?? 0) + (pushUps ?? 0) + (sdc ?? 0) + (plank ?? 0) + (run2mi ?? 0);
     return total;
   }
 }
