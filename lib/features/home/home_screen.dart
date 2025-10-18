@@ -13,6 +13,9 @@ import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/data/aft_repository.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
+import 'package:aft_firebase_app/features/aft/logic/slider_config.dart' as slidercfg;
+import 'package:aft_firebase_app/widgets/aft_event_slider.dart';
+import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
@@ -137,6 +140,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
 
     final profile = ref.watch(aftProfileProvider);
     final computed = ref.watch(aftComputedProvider);
+    final inputs = ref.watch(aftInputsProvider);
     // Light haptic when total score transitions to a valid number.
     ref.listen<AftComputed>(aftComputedProvider, (prev, next) {
       if (next.total != null && next.total != prev?.total) {
@@ -358,6 +362,24 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Builder(
+                builder: (context) {
+                  final cfg = slidercfg.getSliderConfig(profile.standard, profile, AftEvent.mdl);
+                  final curr = ((inputs.mdlLbs ?? int.tryParse(_mdlController.text) ?? cfg.min.toInt())
+                      .clamp(cfg.min.toInt(), cfg.max.toInt())).toInt();
+                  return AftIntSlider(
+                    label: 'Weight',
+                    value: curr,
+                    suffix: 'lbs',
+                    config: cfg,
+                    onChanged: (v) {
+                      _mdlController.text = '$v';
+                      _onMdlChanged(_mdlController.text);
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -400,6 +422,23 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Builder(
+                builder: (context) {
+                  final cfg = slidercfg.getSliderConfig(profile.standard, profile, AftEvent.pushUps);
+                  final curr = ((inputs.pushUps ?? int.tryParse(_puController.text) ?? cfg.min.toInt())
+                      .clamp(cfg.min.toInt(), cfg.max.toInt())).toInt();
+                  return AftIntSlider(
+                    label: 'Repetitions',
+                    value: curr,
+                    config: cfg,
+                    onChanged: (v) {
+                      _puController.text = '$v';
+                      _onPuChanged(_puController.text);
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -425,6 +464,23 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   hintText: 'e.g., 01:45',
                   errorText: _sdcError,
                 ),
+              ),
+              const SizedBox(height: 8),
+              Builder(
+                builder: (context) {
+                  final cfg = slidercfg.getSliderConfig(profile.standard, profile, AftEvent.sdc);
+                  final sec = inputs.sdc?.inSeconds ?? parseMmSs(_sdcController.text)?.inSeconds ?? cfg.min.toInt();
+                  final curr = sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
+                  return AftTimeSlider(
+                    label: 'Sprint-Drag-Carry',
+                    seconds: curr,
+                    config: cfg,
+                    onChanged: (v) {
+                      _sdcController.text = slidercfg.formatMmSs(v);
+                      _onSdcChanged(_sdcController.text);
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -452,6 +508,23 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   errorText: _plankError,
                 ),
               ),
+              const SizedBox(height: 8),
+              Builder(
+                builder: (context) {
+                  final cfg = slidercfg.getSliderConfig(profile.standard, profile, AftEvent.plank);
+                  final sec = inputs.plank?.inSeconds ?? parseMmSs(_plankController.text)?.inSeconds ?? cfg.min.toInt();
+                  final curr = sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
+                  return AftTimeSlider(
+                    label: 'Plank',
+                    seconds: curr,
+                    config: cfg,
+                    onChanged: (v) {
+                      _plankController.text = slidercfg.formatMmSs(v);
+                      _onPlankChanged(_plankController.text);
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -477,6 +550,23 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   hintText: 'e.g., 16:45',
                   errorText: _run2miError,
                 ),
+              ),
+              const SizedBox(height: 8),
+              Builder(
+                builder: (context) {
+                  final cfg = slidercfg.getSliderConfig(profile.standard, profile, AftEvent.run2mi);
+                  final sec = inputs.run2mi?.inSeconds ?? parseMmSs(_run2miController.text)?.inSeconds ?? cfg.min.toInt();
+                  final curr = sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
+                  return AftTimeSlider(
+                    label: '2-Mile Run',
+                    seconds: curr,
+                    config: cfg,
+                    onChanged: (v) {
+                      _run2miController.text = slidercfg.formatMmSs(v);
+                      _onRunChanged(_run2miController.text);
+                    },
+                  );
+                },
               ),
             ],
           ),
