@@ -12,10 +12,12 @@ import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/data/aft_repository.dart';
+import 'package:aft_firebase_app/features/saves/editing.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
 import 'package:aft_firebase_app/features/aft/logic/slider_config.dart' as slidercfg;
 import 'package:aft_firebase_app/widgets/aft_event_slider.dart';
 import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
+import 'package:aft_firebase_app/router/app_router.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
@@ -141,6 +143,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     final profile = ref.watch(aftProfileProvider);
     final computed = ref.watch(aftComputedProvider);
     final inputs = ref.watch(aftInputsProvider);
+    final editing = ref.watch(editingSetProvider);
     // Light haptic when total score transitions to a valid number.
     ref.listen<AftComputed>(aftComputedProvider, (prev, next) {
       if (next.total != null && next.total != prev?.total) {
@@ -198,7 +201,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   ),
                   const SizedBox(width: 8),
                   Tooltip(
-                    message: auth.isSignedIn ? 'Save results' : 'Sign in to save results',
+                    message: auth.isSignedIn
+                        ? (editing != null ? 'Update saved set' : 'Save results')
+                        : 'Sign in to save results',
                     preferBelow: false,
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
@@ -212,22 +217,91 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                               final computedNow = ref.read(aftComputedProvider);
                               final repo = ref.read(aftRepositoryProvider);
                               final userId = ref.read(authStateProvider).userId!;
+                              final createdAt = editing?.createdAt ?? DateTime.now();
                               final set = ScoreSet(
+                                id: editing?.id,
                                 profile: profileNow,
                                 inputs: inputsNow,
                                 computed: computedNow,
-                                createdAt: DateTime.now(),
+                                createdAt: createdAt,
                               );
-                              await repo.saveScoreSet(userId: userId, set: set);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Saved')),
-                                );
+                              if (editing != null) {
+                                await repo.updateScoreSet(userId: userId, set: set);
+                                // Clear editing state after successful update
+                                ref.read(editingSetProvider.notifier).state = null;
+                                if (context.mounted) {
+                                  final testDateLabel = profileNow.testDate == null
+                                      ? '—'
+                                      : formatYmd(profileNow.testDate!);
+                                  final totalLabel = computedNow.total?.toString() ?? '—';
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Test updated'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Test date: $testDateLabel'),
+                                          Text('Total: $totalLabel'),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(),
+                                          child: const Text('Close'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () {
+                                            Navigator.of(ctx).pop();
+                                            Navigator.pushNamed(context, Routes.savedSets);
+                                          },
+                                          child: const Text('View saved sets'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              } else {
+                                await repo.saveScoreSet(userId: userId, set: set);
+                                if (context.mounted) {
+                                  final testDateLabel = profileNow.testDate == null
+                                      ? '—'
+                                      : formatYmd(profileNow.testDate!);
+                                  final totalLabel = computedNow.total?.toString() ?? '—';
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Test saved'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Test date: $testDateLabel'),
+                                          Text('Total: $totalLabel'),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(),
+                                          child: const Text('Close'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () {
+                                            Navigator.of(ctx).pop();
+                                            Navigator.pushNamed(context, Routes.savedSets);
+                                          },
+                                          child: const Text('View saved sets'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
                               }
                             }
                           : null,
                       icon: const Icon(Icons.save_outlined),
-                      label: const Text('Save'),
+                      label: Text(editing != null ? 'Update' : 'Save'),
                     ),
                   ),
                 ],
