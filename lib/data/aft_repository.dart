@@ -8,19 +8,22 @@ import 'package:aft_firebase_app/features/aft/state/providers.dart' show AftComp
 
 @immutable
 class ScoreSet {
+  final String id;
   final AftProfile profile;
   final AftInputs inputs;
   final AftComputed? computed;
   final DateTime createdAt;
 
-  const ScoreSet({
+  ScoreSet({
+    String? id,
     required this.profile,
     required this.inputs,
     required this.createdAt,
     this.computed,
-  });
+  }) : id = id ?? createdAt.toIso8601String();
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'profile': {
           'age': profile.age,
           'sex': profile.sex.name,
@@ -96,7 +99,10 @@ class ScoreSet {
             total: comp['total'] as int?,
           );
 
+    final id = (json['id'] as String?) ?? (json['createdAt'] as String);
+
     return ScoreSet(
+      id: id,
       profile: profile,
       inputs: inputs,
       computed: computed,
@@ -110,6 +116,20 @@ abstract class AftRepository {
   Future<void> saveScoreSet({
     required String userId,
     required ScoreSet set,
+  });
+
+  Future<void> updateScoreSet({
+    required String userId,
+    required ScoreSet set,
+  });
+
+  Future<void> deleteScoreSet({
+    required String userId,
+    required String id,
+  });
+
+  Future<void> clearScoreSets({
+    required String userId,
   });
 
   Future<List<ScoreSet>> listScoreSets({
