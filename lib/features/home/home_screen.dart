@@ -301,17 +301,47 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                         ],
                       ),
 
-                      // Test date pill (no picker)
+                      // Test date pill (picker + clear)
                       AftPill(
+                        onTap: () async {
+                          final initial = profile.testDate ?? DateTime.now();
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: initial,
+                            firstDate: DateTime(2018, 1, 1),
+                            lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                            helpText: 'Select test date',
+                          );
+                          if (picked != null) {
+                            ref.read(aftProfileProvider.notifier).setTestDate(picked);
+                          }
+                        },
+                        tooltip: 'Set test date',
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Text('Test Date'),
                             const SizedBox(width: 8),
                             Text(
-                              profile.testDate == null ? '—' : _fmtDate(profile.testDate!),
+                              profile.testDate == null ? '—' : formatYmd(profile.testDate!),
                               style: theme.textTheme.bodyMedium,
                             ),
+                            if (profile.testDate != null) ...[
+                              const SizedBox(width: 6),
+                              Tooltip(
+                                message: 'Clear date',
+                                child: InkWell(
+                                  onTap: () {
+                                    ref.read(aftProfileProvider.notifier).setTestDate(null);
+                                  },
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(2),
+                                    child: Icon(Icons.close, size: 16),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -577,9 +607,4 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     );
   }
 
-  String _fmtDate(DateTime d) {
-    final mm = d.month.toString().padLeft(2, '0');
-    final dd = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$mm-$dd';
-  }
 }

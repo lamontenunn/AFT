@@ -4,6 +4,9 @@ import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 /// Sex used for profile context.
 enum AftSex { male, female }
 
+/// Sentinel for copyWith nullable fields to allow explicit null.
+const Object _aftProfileUnset = Object();
+
 /// Immutable profile context for AFT scoring.
 @immutable
 class AftProfile {
@@ -28,13 +31,15 @@ class AftProfile {
   AftProfile copyWith({
     int? age,
     AftSex? sex,
-    DateTime? testDate,
+    Object? testDate = _aftProfileUnset,
     AftStandard? standard,
   }) {
     return AftProfile(
       age: age ?? this.age,
       sex: sex ?? this.sex,
-      testDate: testDate ?? this.testDate,
+      testDate: identical(testDate, _aftProfileUnset)
+          ? this.testDate
+          : testDate as DateTime?,
       standard: standard ?? this.standard,
     );
   }
