@@ -20,8 +20,9 @@ class AftIntSlider extends StatelessWidget {
 
   int _snap(double v) {
     final step = config.step;
-    final snapped = (v / step).round() * step;
-    return snapped.clamp(config.min, config.max).toInt();
+    final min = config.min;
+    final snapped = min + (((v - min) / step).round() * step);
+    return snapped.clamp(min, config.max).toInt();
   }
 
   @override
@@ -30,9 +31,7 @@ class AftIntSlider extends StatelessWidget {
     final theme = Theme.of(context);
     final min = config.min;
     final max = config.max;
-    final divisions = config.divisions != null && config.divisions! > 0
-        ? config.divisions
-        : ((max - min) ~/ config.step).clamp(1, 1000);
+    final int? divisions = null; // continuous; snapping handled manually relative to min
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,8 +95,9 @@ class AftTimeSlider extends StatelessWidget {
 
   int _snap(double v) {
     final step = config.step;
-    final snapped = (v / step).round() * step;
-    return snapped.clamp(config.min, config.max).toInt();
+    final min = config.min;
+    final snapped = min + (((v - min) / step).round() * step);
+    return snapped.clamp(min, config.max).toInt();
   }
 
   @override
@@ -106,9 +106,7 @@ class AftTimeSlider extends StatelessWidget {
     final theme = Theme.of(context);
     final min = config.min;
     final max = config.max;
-    final divisions = config.divisions != null && config.divisions! > 0
-        ? config.divisions
-        : ((max - min) ~/ config.step).clamp(1, 3600);
+    final int? divisions = null; // continuous; snapping handled manually relative to min
 
     final clamped = seconds.clamp(min.toInt(), max.toInt());
 
