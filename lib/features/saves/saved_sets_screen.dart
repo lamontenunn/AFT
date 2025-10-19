@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/data/aft_repository.dart';
+import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
 
 class SavedSetsScreen extends ConsumerWidget {
   const SavedSetsScreen({super.key});
@@ -45,12 +46,18 @@ class SavedSetsScreen extends ConsumerWidget {
               final set = sets[index];
               final total = set.computed?.total;
               final date = set.createdAt;
-              final dateLabel = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} '
-                  '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+              final savedAtLabel = formatYmdHm(date);
+              final testDateLabel = set.profile.testDate == null ? '—' : formatYmd(set.profile.testDate!);
               return ListTile(
                 leading: const Icon(Icons.fitness_center_outlined),
                 title: Text('Total: ${total ?? '—'}'),
-                subtitle: Text('Saved $dateLabel'),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Test date: $testDateLabel'),
+                    Text('Saved $savedAtLabel'),
+                  ],
+                ),
               );
             },
           );

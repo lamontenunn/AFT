@@ -42,3 +42,18 @@ class MmSsFormatter extends TextInputFormatter {
     );
   }
 }
+
+/// Formats a DateTime as YYYY-MM-DD (zero-padded).
+String formatYmd(DateTime d) {
+  final mm = d.month.toString().padLeft(2, '0');
+  final dd = d.day.toString().padLeft(2, '0');
+  return '${d.year}-$mm-$dd';
+}
+
+/// Formats a DateTime as YYYY-MM-DD HH:mm (24h, zero-padded).
+String formatYmdHm(DateTime d) {
+  final date = formatYmd(d);
+  final hh = d.hour.toString().padLeft(2, '0');
+  final mm = d.minute.toString().padLeft(2, '0');
+  return '$date $hh:$mm';
+}
