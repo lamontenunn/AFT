@@ -200,6 +200,63 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  if (editing != null)
+                    TextButton.icon(
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Cancel update?'),
+                            content: const Text('Discard your changes and exit editing mode?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('Keep editing'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('Discard'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (ok == true) {
+                          final repo = ref.read(aftRepositoryProvider);
+                          final userId = ref.read(effectiveUserIdProvider);
+                          final sets = await repo.listScoreSets(userId: userId);
+                          ScoreSet? original;
+                          for (final s in sets) {
+                            if (s.id == editing!.id) {
+                              original = s;
+                              break;
+                            }
+                          }
+                          if (original != null) {
+                            final p = original!.profile;
+                            final i = original!.inputs;
+                            final prof = ref.read(aftProfileProvider.notifier);
+                            prof.setAge(p.age);
+                            prof.setSex(p.sex);
+                            prof.setStandard(p.standard);
+                            prof.setTestDate(p.testDate);
+                            final inp = ref.read(aftInputsProvider.notifier);
+                            inp.setMdlLbs(i.mdlLbs);
+                            inp.setPushUps(i.pushUps);
+                            inp.setSdc(i.sdc);
+                            inp.setPlank(i.plank);
+                            inp.setRun2mi(i.run2mi);
+                          }
+                          ref.read(editingSetProvider.notifier).state = null;
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Update canceled')),
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.close),
+                      label: const Text('Cancel'),
+                    ),
                   Tooltip(
                     message: auth.isSignedIn
                         ? (editing != null ? 'Update saved set' : 'Save results')
@@ -216,7 +273,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                               final inputsNow = ref.read(aftInputsProvider);
                               final computedNow = ref.read(aftComputedProvider);
                               final repo = ref.read(aftRepositoryProvider);
-                              final userId = ref.read(authStateProvider).userId!;
+                              final userId = ref.read(effectiveUserIdProvider);
                               final createdAt = editing?.createdAt ?? DateTime.now();
                               final set = ScoreSet(
                                 id: editing?.id,

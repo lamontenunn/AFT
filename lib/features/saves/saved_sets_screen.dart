@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/data/aft_repository.dart';
+import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
@@ -14,7 +15,8 @@ class SavedSetsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
-    if (!auth.isSignedIn) {
+    final effectiveId = ref.watch(effectiveUserIdProvider);
+    if (!auth.isSignedIn && effectiveId != 'guest') {
       return Scaffold(
         appBar: AppBar(title: const Text('Saved sets')),
         body: const Center(
@@ -27,6 +29,21 @@ class SavedSetsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Saved sets'),
         actions: [
+          if (auth.isSignedIn && effectiveId != 'guest')
+            IconButton(
+              tooltip: 'Merge guest data',
+              icon: const Icon(Icons.merge_type_outlined),
+              onPressed: () async {
+                final uid = auth.userId!;
+                await GuestMigration.maybeMigrateGuestTo(uid);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Guest data merged (if any)')),
+                  );
+                  Navigator.pushReplacementNamed(context, Routes.savedSets);
+                }
+              },
+            ),
           IconButton(
             tooltip: 'Clear all',
             icon: const Icon(Icons.delete_sweep_outlined),
@@ -44,7 +61,7 @@ class SavedSetsScreen extends ConsumerWidget {
               );
               if (ok == true) {
                 final repo = ref.read(aftRepositoryProvider);
-                final userId = ref.read(authStateProvider).userId!;
+                final userId = ref.read(effectiveUserIdProvider);
                 await repo.clearScoreSets(userId: userId);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All sets cleared')));
@@ -56,7 +73,7 @@ class SavedSetsScreen extends ConsumerWidget {
         ],
       ),
       body: FutureBuilder<List<ScoreSet>>(
-        future: ref.read(aftRepositoryProvider).listScoreSets(userId: auth.userId!),
+        future: ref.read(aftRepositoryProvider).listScoreSets(userId: effectiveId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -104,7 +121,7 @@ class SavedSetsScreen extends ConsumerWidget {
                   );
                   if (ok == true) {
                     final repo = ref.read(aftRepositoryProvider);
-                    final userId = ref.read(authStateProvider).userId!;
+                    final userId = ref.read(effectiveUserIdProvider);
                     await repo.deleteScoreSet(userId: userId, id: set.id);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deleted')));
