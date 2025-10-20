@@ -31,7 +31,7 @@ class AftIntSlider extends StatelessWidget {
     final theme = Theme.of(context);
     final min = config.min;
     final max = config.max;
-    final int? divisions = null; // continuous; snapping handled manually relative to min
+    final int? divisions = config.divisions; // discrete ticks to ensure endpoints are reachable
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,12 +86,14 @@ class AftTimeSlider extends StatelessWidget {
     required this.seconds,
     required this.config,
     required this.onChanged,
+    this.reversed = false,
   });
 
   final String label;
   final int seconds; // current value in seconds
   final SliderConfig config;
   final ValueChanged<int> onChanged;
+  final bool reversed;
 
   int _snap(double v) {
     final step = config.step;
@@ -106,9 +108,13 @@ class AftTimeSlider extends StatelessWidget {
     final theme = Theme.of(context);
     final min = config.min;
     final max = config.max;
-    final int? divisions = null; // continuous; snapping handled manually relative to min
+    // Use 1-second tick granularity so endpoints are exactly reachable,
+    // while still snapping to config.step in onChanged.
+    final int divisions = (max - min).toInt();
 
     final clamped = seconds.clamp(min.toInt(), max.toInt());
+    // UI value mapping: when reversed, rightward drag lowers time (higher score).
+    final double uiValue = reversed ? (min + max - clamped) : clamped.toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,20 +139,32 @@ class AftTimeSlider extends StatelessWidget {
             showValueIndicator: ShowValueIndicator.always,
           ),
           child: Slider(
-            value: clamped.toDouble(),
+            value: uiValue,
             min: min,
             max: max,
             divisions: divisions,
             label: formatMmSs(clamped),
-            onChanged: (v) => onChanged(_snap(v)),
+            onChanged: (v) {
+              // Snap in the seconds domain so endpoints (min/max) are always reachable,
+              // then apply clamping. Do the reverse mapping BEFORE snapping.
+              final secondsRaw = reversed ? (min + max - v) : v;
+              final snapped = _snap(secondsRaw);
+              onChanged(snapped);
+            },
           ),
         ),
         // Min/Max labels
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(formatMmSs(min.toInt()), style: theme.textTheme.labelSmall),
-            Text(formatMmSs(max.toInt()), style: theme.textTheme.labelSmall),
+            Text(
+              reversed ? formatMmSs(max.toInt()) : formatMmSs(min.toInt()),
+              style: theme.textTheme.labelSmall,
+            ),
+            Text(
+              reversed ? formatMmSs(min.toInt()) : formatMmSs(max.toInt()),
+              style: theme.textTheme.labelSmall,
+            ),
           ],
         ),
       ],
