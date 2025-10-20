@@ -5,6 +5,9 @@ import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/auth_state.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
+import 'package:aft_firebase_app/router/app_router.dart';
+import 'package:aft_firebase_app/features/auth/providers.dart';
+import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 
 /// App shell with a collapsing AppBar, segmented control, and overflow sheet.
 /// - Title: "AFT Calculator"
@@ -156,10 +159,7 @@ class _ProfileButton extends ConsumerWidget {
                   title: const Text('Sign in'),
                   onTap: () async {
                     Navigator.of(context).pop();
-                    await ref.read(authActionsProvider).signIn();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Signed in as Demo User')),
-                    );
+                    Navigator.of(context).pushNamed(Routes.signIn);
                   },
                 ),
                 const SizedBox(height: 8),
@@ -183,11 +183,33 @@ class _ProfileButton extends ConsumerWidget {
                   leading: const Icon(Icons.logout),
                   title: const Text('Sign out'),
                   onTap: () async {
+                    final asyncUser = ref.read(firebaseUserProvider);
+                    final user = asyncUser.asData?.value;
+                    final isAnon = user?.isAnonymous ?? true;
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Sign out?'),
+                        content: Text(
+                          isAnon
+                              ? 'Guest data stays on this device and can be merged when you sign in later.'
+                              : 'You can sign back in at any time.',
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Sign out')),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+
                     Navigator.of(context).pop();
                     await ref.read(authActionsProvider).signOut();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Signed out')),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Signed out')),
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 8),

@@ -3,11 +3,14 @@ import 'package:aft_firebase_app/shell/aft_scaffold.dart';
 import 'package:aft_firebase_app/features/home/home_screen.dart';
 import 'package:aft_firebase_app/screens/standards_screen.dart';
 import 'package:aft_firebase_app/features/saves/saved_sets_screen.dart';
+import 'package:aft_firebase_app/features/auth/sign_in_page.dart';
+import 'package:aft_firebase_app/features/auth/auth_gate.dart';
 
 class Routes {
   static const String home = '/';
   static const String standards = '/standards';
   static const String savedSets = '/saved-sets';
+  static const String signIn = '/sign-in';
 }
 
 class AppRouter {
@@ -16,7 +19,7 @@ class AppRouter {
       case Routes.home:
         return MaterialPageRoute(
           settings: settings,
-          builder: (context) => const AftScaffold(child: FeatureHomeScreen()),
+          builder: (context) => const AuthGate(),
         );
       case Routes.standards:
         return MaterialPageRoute(
@@ -27,6 +30,11 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (context) => const SavedSetsScreen(),
+        );
+      case Routes.signIn:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (context) => const SignInPage(),
         );
       default:
         return MaterialPageRoute(
