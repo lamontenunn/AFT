@@ -82,9 +82,9 @@ List<List<int>> _buildDense(Map<int, List<int>> raw) {
     }
   }
 
-  // Apply fill rule per column for all points 100..0:
-  // If value at P is -1, look for next LOWER provided point with a published requirement.
-  // If none by 0, use minPublished for that column.
+  // Fill-down per column 100→0:
+  // If value at P is -1, inherit the next LOWER provided point (search P-1..0).
+  // If none found, leave as -1 (missing) so awarding will skip it.
   for (var c = 0; c < _numAges; c++) {
     for (var p = 100; p >= 0; p--) {
       final idx = 100 - p;
@@ -100,7 +100,7 @@ List<List<int>> _buildDense(Map<int, List<int>> raw) {
           break;
         }
       }
-      dense[idx][c] = replacement ?? minPublished[c];
+      dense[idx][c] = replacement ?? -1;
     }
   }
 
@@ -160,7 +160,7 @@ int plkPointsForSex(AftSex sex, int age, Duration time) {
 
   for (var p = 100; p >= 0; p--) {
     final reqSecs = dense[100 - p][ageIdx];
-    if (secs >= reqSecs) {
+    if (reqSecs >= 0 && secs >= reqSecs) {
       return p;
     }
   }

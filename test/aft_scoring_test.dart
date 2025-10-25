@@ -33,32 +33,34 @@ void main() {
   });
 
   group('MDL (weight-based, higher is better)', () {
-    test('Anchors and boundaries - M17–21', () {
+    test('Anchors and boundaries - M17-21', () {
       expect(mdlPointsForSex(AftSex.male, 20, 340), 100);
-      expect(mdlPointsForSex(AftSex.male, 20, 330), 99);
-      expect(mdlPointsForSex(AftSex.male, 20, 300), 93);
+      expect(mdlPointsForSex(AftSex.male, 20, 330), 98);
+      expect(mdlPointsForSex(AftSex.male, 20, 300), 92);
       // boundary below/above
       expect(mdlPointsForSex(AftSex.male, 20, 79), 0);
-      expect(mdlPointsForSex(AftSex.male, 20, 80), 9);
+      expect(mdlPointsForSex(AftSex.male, 20, 80), 0);
     });
 
-    test('Anchors - M22–26', () {
+    test('Anchors - M22-26', () {
       expect(mdlPointsForSex(AftSex.male, 24, 350), 100);
       expect(mdlPointsForSex(AftSex.male, 24, 340), 99);
-      expect(mdlPointsForSex(AftSex.male, 24, 330), 98);
+      expect(mdlPointsForSex(AftSex.male, 24, 330), 97);
+      expect(mdlPointsForSex(AftSex.male, 24, 80), 0);
+      expect(mdlPointsForSex(AftSex.male, 24, 145), 50);
     });
 
     test('Anchors - M62+', () {
       expect(mdlPointsForSex(AftSex.male, 65, 170), 92);
-      expect(mdlPointsForSex(AftSex.male, 65, 140), 71);
-      expect(mdlPointsForSex(AftSex.male, 65, 120), 49);
+      expect(mdlPointsForSex(AftSex.male, 65, 140), 60);
+      expect(mdlPointsForSex(AftSex.male, 65, 120), 40);
     });
 
     test('Female anchors - F17–21', () {
       expect(mdlPointsForSex(AftSex.female, 20, 220), 100);
-      expect(mdlPointsForSex(AftSex.female, 20, 210), 99);
-      expect(mdlPointsForSex(AftSex.female, 20, 120), 67);
-      expect(mdlPointsForSex(AftSex.female, 20, 60), 9);
+      expect(mdlPointsForSex(AftSex.female, 20, 210), 98);
+      expect(mdlPointsForSex(AftSex.female, 20, 120), 60);
+      expect(mdlPointsForSex(AftSex.female, 20, 60), 0);
     });
   });
 
