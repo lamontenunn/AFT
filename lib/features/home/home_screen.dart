@@ -38,6 +38,14 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
   final _sdcController = TextEditingController(); // mm:ss
   final _plankController = TextEditingController(); // mm:ss
   final _run2miController = TextEditingController(); // mm:ss
+
+  // Focus management for better keyboard UX on mobile
+  final _mdlFocus = FocusNode();
+  final _puFocus = FocusNode();
+  final _sdcFocus = FocusNode();
+  final _plankFocus = FocusNode();
+  final _runFocus = FocusNode();
+
   String? _mdlError;
   String? _puError;
   String? _sdcError;
@@ -52,6 +60,14 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     _sdcController.dispose();
     _plankController.dispose();
     _run2miController.dispose();
+
+    // Dispose focus nodes
+    _mdlFocus.dispose();
+    _puFocus.dispose();
+    _sdcFocus.dispose();
+    _plankFocus.dispose();
+    _runFocus.dispose();
+
     super.dispose();
   }
 
@@ -153,8 +169,11 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     final auth = ref.watch(authStateProvider);
     final bool canSave = auth.isSignedIn && computed.total != null;
 
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: ListView(
+        padding: EdgeInsets.only(bottom: 24 + MediaQuery.of(context).viewInsets.bottom),
       children: [
 
 
@@ -499,6 +518,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   Expanded(
                     child: TextField(
                       controller: _mdlController,
+                      focusNode: _mdlFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(context).requestFocus(_puFocus),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       onChanged: _onMdlChanged,
@@ -560,6 +582,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                   Expanded(
                     child: TextField(
                       controller: _puController,
+                      focusNode: _puFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(context).requestFocus(_sdcFocus),
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       onChanged: _onPuChanged,
@@ -616,6 +641,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               const SizedBox(height: 6),
               TextField(
                 controller: _sdcController,
+                focusNode: _sdcFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => FocusScope.of(context).requestFocus(_plankFocus),
                 keyboardType: TextInputType.number,
                 inputFormatters: [MmSsFormatter()],
                 onChanged: _onSdcChanged,
@@ -660,6 +688,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               const SizedBox(height: 6),
               TextField(
                 controller: _plankController,
+                focusNode: _plankFocus,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => FocusScope.of(context).requestFocus(_runFocus),
                 keyboardType: TextInputType.number,
                 inputFormatters: [MmSsFormatter()],
                 onChanged: _onPlankChanged,
@@ -703,6 +734,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               const SizedBox(height: 6),
               TextField(
                 controller: _run2miController,
+                focusNode: _runFocus,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => FocusScope.of(context).unfocus(),
                 keyboardType: TextInputType.number,
                 inputFormatters: [MmSsFormatter()],
                 onChanged: _onRunChanged,
@@ -737,7 +771,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
 
         const SizedBox(height: 12),
       ],
-    );
+    ));
   }
 
 }
