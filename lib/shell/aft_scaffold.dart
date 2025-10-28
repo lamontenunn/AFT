@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
@@ -23,12 +24,54 @@ class AftScaffold extends ConsumerWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    // Determine current tab index based on the active route (Material 3 NavigationBar)
+    final routeName = ModalRoute.of(context)?.settings.name ?? Routes.home;
+    final int currentIndex = switch (routeName) {
+      Routes.home => 0,
+      Routes.savedSets => 1,
+      Routes.standards => 2,
+      _ => 0,
+    };
+
     return Scaffold(
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        onDestinationSelected: (int i) {
+          if (i == currentIndex) return;
+          HapticFeedback.selectionClick();
+          final nextRoute = switch (i) {
+            0 => Routes.home,
+            1 => Routes.savedSets,
+            2 => Routes.standards,
+            _ => Routes.home,
+          };
+          // Replace the current page in the stack when switching tabs
+          Navigator.of(context).pushReplacementNamed(nextRoute);
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.calculate_outlined),
+            selectedIcon: Icon(Icons.calculate),
+            label: 'Calculator',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Saved Sets',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.flag_outlined),
+            selectedIcon: Icon(Icons.flag),
+            label: 'Standards',
+          ),
+        ],
+      ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerScrolled) {
           return [
             SliverAppBar(
-              pinned: true,
+              pinned: false,
               centerTitle: true,
               title: const Text(
                 'AFT Calculator',

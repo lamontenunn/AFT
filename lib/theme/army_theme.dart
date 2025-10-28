@@ -115,6 +115,31 @@ class ArmyTheme {
               : ArmyNeutrals.gray700;
         }),
       ),
+      // Material 3 NavigationBar theming for a modern bottom nav look
+      navigationBarTheme: NavigationBarThemeData(
+        elevation: 3,
+        backgroundColor: scheme.surface,
+        surfaceTintColor: scheme.surfaceTint,
+        indicatorColor: ArmyColors.gold.withOpacity(0.20),
+        indicatorShape: const StadiumBorder(),
+        height: 48, // ~40% smaller than default ~80
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+            size: selected ? 24 : 22,
+          );
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11.5,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+          );
+        }),
+      ),
     );
   }
 }

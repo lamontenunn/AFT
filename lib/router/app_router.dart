@@ -17,19 +17,37 @@ class AppRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case Routes.home:
-        return MaterialPageRoute(
+        return PageRouteBuilder(
           settings: settings,
-          builder: (context) => const AuthGate(),
+          pageBuilder: (context, animation, secondaryAnimation) => const AuthGate(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // No transition to prevent shell (AppBar/BottomNav) double-render during switches
+            return child;
+          },
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         );
       case Routes.standards:
-        return MaterialPageRoute(
+        return PageRouteBuilder(
           settings: settings,
-          builder: (context) => const StandardsScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const AftScaffold(child: StandardsScreen()),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return child;
+          },
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         );
       case Routes.savedSets:
-        return MaterialPageRoute(
+        return PageRouteBuilder(
           settings: settings,
-          builder: (context) => const SavedSetsScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const AftScaffold(child: SavedSetsScreen()),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return child;
+          },
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
         );
       case Routes.signIn:
         return MaterialPageRoute(
