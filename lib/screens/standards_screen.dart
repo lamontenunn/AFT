@@ -6,10 +6,14 @@ class StandardsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Standards')),
-      body: const Center(
-        child: Text('Standards screen (stub)'),
+    // Body-only content; AftScaffold provides the global AppBar/NavigationBar.
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Text(
+          'Standards screen (stub)',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
       ),
     );
   }
