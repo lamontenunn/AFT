@@ -1,4 +1,4 @@
-# AFT (Army Fitness Test) – Flutter + Riverpod + Firebase
+# AFT (Army Fitness Test) – Flutter + Firebase
 
 Multi-platform Flutter app that calculates AFT scores with real age/sex tables, a live total, and a branded dark theme. Uses Riverpod for state management and local persistence via shared_preferences. Firebase is initialized; authentication is currently a demo toggle.
 
