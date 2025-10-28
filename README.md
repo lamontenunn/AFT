@@ -128,6 +128,3 @@ Run tests
 - Accessibility/i18n improvements; analytics/logging
 - Additional tests (widget/goldens, end-to-end provider flows)
 
-## License
-
-TBD (add a LICENSE file if you plan to open source)
