@@ -18,6 +18,7 @@ import 'package:aft_firebase_app/features/aft/logic/slider_config.dart' as slide
 import 'package:aft_firebase_app/widgets/aft_event_slider.dart';
 import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
+import 'package:aft_firebase_app/state/settings_state.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
@@ -51,6 +52,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
   String? _sdcError;
   String? _plankError;
   String? _run2miError;
+
+  // Apply default profile (from Settings) once per visit when not editing
+  bool _prefillApplied = false;
 
 
   @override
@@ -168,6 +172,67 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     });
     final auth = ref.watch(authStateProvider);
     final bool canSave = auth.isSignedIn && computed.total != null;
+
+    // React to Settings changes while on Calculator (apply defaults when not editing)
+    ref.listen<SettingsState>(settingsProvider, (prev, next) {
+      final editingNow = ref.read(editingSetProvider);
+      if (!next.applyDefaultsOnCalculator || editingNow != null) return;
+
+      // Compute age from DOB and apply if changed
+      final dob = next.defaultBirthdate;
+      if (dob != null) {
+        final now = DateTime.now();
+        int age = now.year - dob.year;
+        final hasHadBirthday = (now.month > dob.month) ||
+            (now.month == dob.month && now.day >= dob.day);
+        if (!hasHadBirthday) age--;
+        // Clamp to supported dropdown range [17..80] to avoid invalid value assertions
+        int clamped = age;
+        if (clamped < 17) clamped = 17;
+        if (clamped > 80) clamped = 80;
+        final current = ref.read(aftProfileProvider).age;
+        if (current != clamped) {
+          ref.read(aftProfileProvider.notifier).setAge(clamped);
+        }
+      }
+      // Apply sex if changed
+      final sex = next.defaultSex;
+      if (sex != null && ref.read(aftProfileProvider).sex != sex) {
+        ref.read(aftProfileProvider.notifier).setSex(sex);
+      }
+    });
+
+    // Prefill Calculator profile from Settings defaults when not editing
+    if (!_prefillApplied) {
+      final settings = ref.read(settingsProvider);
+      if (settings.applyDefaultsOnCalculator && editing == null) {
+        _prefillApplied = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final prof = ref.read(aftProfileProvider.notifier);
+          // Default birthdate -> compute age today
+          final dob = settings.defaultBirthdate;
+          if (dob != null) {
+            final now = DateTime.now();
+            int age = now.year - dob.year;
+            final hasHadBirthday = (now.month > dob.month) ||
+                (now.month == dob.month && now.day >= dob.day);
+            if (!hasHadBirthday) age--;
+            // Clamp to supported dropdown range [17..80]
+            int clampedAge = age;
+            if (clampedAge < 17) clampedAge = 17;
+            if (clampedAge > 80) clampedAge = 80;
+            prof.setAge(clampedAge);
+          }
+          // Default sex
+          final defSex = settings.defaultSex;
+          if (defSex != null) {
+            prof.setSex(defSex);
+          }
+        });
+      } else {
+        _prefillApplied = true;
+      }
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -416,7 +481,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                               child: DropdownButton<int>(
                                 value: profile.age,
                                 dropdownColor: cs.surface,
-                                items: List.generate(63, (i) => 18 + i)
+                                items: List.generate(64, (i) => 17 + i)
                                     .map((a) => DropdownMenuItem(
                                           value: a,
                                           child: Text('$a'),

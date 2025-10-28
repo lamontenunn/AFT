@@ -9,6 +9,7 @@ import 'package:aft_firebase_app/theme/army_colors.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/features/saves/guest_migration.dart';
+import 'package:aft_firebase_app/state/settings_state.dart';
 
 /// App shell with a collapsing AppBar, segmented control, and overflow sheet.
 /// - Title: "AFT Calculator"
@@ -32,20 +33,30 @@ class AftScaffold extends ConsumerWidget {
       Routes.home => 0,
       Routes.savedSets => 1,
       Routes.standards => 2,
+      Routes.settings => 3,
       _ => 0,
     };
+
+    final settings = ref.watch(settingsProvider);
+    final navLabelBehavior =
+        settings.navBehavior == NavLabelBehavior.always
+            ? NavigationDestinationLabelBehavior.alwaysShow
+            : NavigationDestinationLabelBehavior.onlyShowSelected;
 
     return Scaffold(
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
-        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        labelBehavior: navLabelBehavior,
         onDestinationSelected: (int i) {
           if (i == currentIndex) return;
-          HapticFeedback.selectionClick();
+          if (settings.hapticsEnabled) {
+            HapticFeedback.selectionClick();
+          }
           final nextRoute = switch (i) {
             0 => Routes.home,
             1 => Routes.savedSets,
             2 => Routes.standards,
+            3 => Routes.settings,
             _ => Routes.home,
           };
           // Replace the current page in the stack when switching tabs
@@ -67,6 +78,11 @@ class AftScaffold extends ConsumerWidget {
             selectedIcon: Icon(Icons.flag),
             label: 'Standards',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
         ],
       ),
       body: NestedScrollView(
@@ -82,8 +98,6 @@ class AftScaffold extends ConsumerWidget {
               ),
               actions: [
                 const _ProfileButton(),
-                const SizedBox(width: 8),
-                const _OverflowButton(),
                 const SizedBox(width: 8),
               ],
               bottom: PreferredSize(
@@ -218,14 +232,6 @@ class _ProfileButton extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.folder_outlined),
-                  title: const Text('Saved sets'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pushNamed('/saved-sets');
-                  },
-                ),
-                ListTile(
                   leading: const Icon(Icons.logout),
                   title: const Text('Sign out'),
                   onTap: () async {
@@ -263,66 +269,6 @@ class _ProfileButton extends ConsumerWidget {
             ),
           );
         }
-      },
-    );
-  }
-}
-
-class _OverflowButton extends StatelessWidget {
-  const _OverflowButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.more_vert),
-      tooltip: 'More',
-      onPressed: () => _showOverflowSheet(context),
-    );
-  }
-
-  void _showOverflowSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.flag_outlined),
-                title: const Text('Standards'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pushNamed('/standards');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.timeline_outlined),
-                title: const Text('Timeline'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Timeline (coming soon)')),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: const Text('Settings'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Settings (coming soon)')),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
       },
     );
   }
