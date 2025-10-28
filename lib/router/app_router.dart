@@ -5,13 +5,15 @@ import 'package:aft_firebase_app/screens/standards_screen.dart';
 import 'package:aft_firebase_app/features/saves/saved_sets_screen.dart';
 import 'package:aft_firebase_app/features/auth/sign_in_page.dart';
 import 'package:aft_firebase_app/features/auth/auth_gate.dart';
+import 'package:aft_firebase_app/screens/settings_screen.dart';
 
-class Routes {
-  static const String home = '/';
-  static const String standards = '/standards';
-  static const String savedSets = '/saved-sets';
-  static const String signIn = '/sign-in';
-}
+ class Routes {
+   static const String home = '/';
+   static const String standards = '/standards';
+   static const String savedSets = '/saved-sets';
+   static const String settings = '/settings';
+   static const String signIn = '/sign-in';
+ }
 
 class AppRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -49,11 +51,22 @@ class AppRouter {
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
         );
-      case Routes.signIn:
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (context) => const SignInPage(),
-        );
+       case Routes.settings:
+         return PageRouteBuilder(
+           settings: settings,
+           pageBuilder: (context, animation, secondaryAnimation) =>
+               const AftScaffold(showHeader: false, child: SettingsScreen()),
+           transitionsBuilder: (context, animation, secondaryAnimation, child) {
+             return child;
+           },
+           transitionDuration: Duration.zero,
+           reverseTransitionDuration: Duration.zero,
+         );
+       case Routes.signIn:
+         return MaterialPageRoute(
+           settings: settings,
+           builder: (context) => const SignInPage(),
+         );
       default:
         return MaterialPageRoute(
           settings: settings,
