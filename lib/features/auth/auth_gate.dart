@@ -30,8 +30,8 @@ class AuthGate extends ConsumerWidget {
           // Fire and forget; guarded by SharedPreferences flag internally.
           Future.microtask(() => GuestMigration.maybeMigrateGuestTo(user.uid));
         }
-        // Signed in -> main app shell
-        return const AftScaffold(child: FeatureHomeScreen());
+        // Signed in -> main app shell (show header only on Calculator)
+        return const AftScaffold(showHeader: true, child: FeatureHomeScreen());
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),

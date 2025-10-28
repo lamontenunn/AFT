@@ -15,9 +15,11 @@ import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 /// - Right actions: SegmentedButton for General | Combat, overflow menu
 /// - Collapses on scroll and keeps a small "Total" chip placeholder.
 class AftScaffold extends ConsumerWidget {
-  const AftScaffold({super.key, required this.child});
+  const AftScaffold({super.key, required this.child, this.showHeader = false});
 
   final Widget child;
+
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -69,7 +71,7 @@ class AftScaffold extends ConsumerWidget {
       ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerScrolled) {
-          return [
+          return showHeader ? [
             SliverAppBar(
               pinned: false,
               centerTitle: true,
@@ -92,10 +94,11 @@ class AftScaffold extends ConsumerWidget {
                 ),
               ),
             ),
-          ];
+          ] : [];
         },
         body: SafeArea(
-          top: false,
+          // When there is no header (e.g., Saved Sets, Standards), respect top safe area
+          top: !showHeader,
           bottom: true,
           child: child,
         ),

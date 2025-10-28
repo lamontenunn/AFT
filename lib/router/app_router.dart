@@ -31,7 +31,7 @@ class AppRouter {
         return PageRouteBuilder(
           settings: settings,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const AftScaffold(child: StandardsScreen()),
+              const AftScaffold(showHeader: false, child: StandardsScreen()),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return child;
           },
@@ -42,7 +42,7 @@ class AppRouter {
         return PageRouteBuilder(
           settings: settings,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const AftScaffold(child: SavedSetsScreen()),
+              const AftScaffold(showHeader: false, child: SavedSetsScreen()),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return child;
           },

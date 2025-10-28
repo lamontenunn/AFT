@@ -5,8 +5,8 @@
 /// Points, M17–21, F17–21, M22–26, F22–26, ..., M62+, F62+
 ///
 /// Fill rule (applied per age/sex column independently, top-down 100→0):
-/// - If requirement at P is -1 or missing, inherit the next LOWER P's published requirement.
-/// - If no requirement found by P=0, use the per-column minimum published requirement (or 0).
+/// - If requirement at P is -1 or missing, inherit the next HIGHER P's published requirement.
+/// - If none found up to P=100, leave as -1 (missing) so awarding will skip it.
 ///
 /// Awarding rule:
 /// - Scan from 100 down; return the first (highest) point whose requirement is met
@@ -75,7 +75,7 @@ List<List<int>> _buildDense(Map<int, List<int>> raw) {
   }
 
   // Fill-down per column 100→0:
-  // If value at P is -1, inherit the next LOWER provided point (search P-1..0).
+  // If value at P is -1, inherit from the next HIGHER provided point (search P+1..100).
   // If none found, leave as -1 (missing) so awarding will skip it.
   for (var c = 0; c < _numAges; c++) {
     for (var p = 100; p >= 0; p--) {
@@ -83,10 +83,10 @@ List<List<int>> _buildDense(Map<int, List<int>> raw) {
       if (dense[idx][c] != -1) continue;
 
       int? replacement;
-      for (var p2 = p - 1; p2 >= 0; p2--) {
-        final lower = raw[p2];
-        if (lower == null) continue;
-        final v = lower[c];
+      for (var p2 = p + 1; p2 <= 100; p2++) {
+        final higher = raw[p2];
+        if (higher == null) continue;
+        final v = higher[c];
         if (v != -1) {
           replacement = v;
           break;
