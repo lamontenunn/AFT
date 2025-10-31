@@ -19,6 +19,7 @@ import 'package:aft_firebase_app/widgets/aft_event_slider.dart';
 import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
+import 'package:aft_firebase_app/widgets/aft_svg_icon.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
@@ -572,6 +573,12 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
         AftEventCard(
           title: '3-Rep Max Deadlift (MDL)',
           icon: Icons.fitness_center,
+          leading: const AftSvgIcon(
+            'assets/icons/deadlift.svg',
+            size: 24,
+            padding: const EdgeInsets.all(2),
+            colorFilter: const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
+          ),
           trailing: AftScoreRing(score: computed.mdlScore),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -636,6 +643,12 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
         AftEventCard(
           title: 'Hand-Release Push-ups',
           icon: Icons.accessibility_new,
+          leading: const AftSvgIcon(
+            'assets/icons/pushup.svg',
+            size: 24,
+            padding: const EdgeInsets.all(2),
+            colorFilter: const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
+          ),
           trailing: AftScoreRing(score: computed.pushUpsScore),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -698,6 +711,12 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
         AftEventCard(
           title: 'Sprint-Drag-Carry',
           icon: Icons.timer_outlined,
+          leading: const AftSvgIcon(
+            'assets/icons/dragcarry.svg',
+            size: 24,
+            padding: const EdgeInsets.all(2),
+            colorFilter: const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
+          ),
           trailing: AftScoreRing(score: computed.sdcScore),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,6 +764,12 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
         AftEventCard(
           title: 'Plank',
           icon: Icons.access_time,
+          leading: const AftSvgIcon(
+            'assets/icons/plank.svg',
+            size: 24,
+            padding: const EdgeInsets.all(2),
+            colorFilter: const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
+          ),
           trailing: AftScoreRing(score: computed.plankScore),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -791,6 +816,12 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
         AftEventCard(
           title: '2-Mile Run',
           icon: Icons.directions_run,
+          leading: const AftSvgIcon(
+            'assets/icons/run.svg',
+            size: 24,
+            padding: const EdgeInsets.all(2),
+            colorFilter: const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
+          ),
           trailing: AftScoreRing(score: computed.run2miScore),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
