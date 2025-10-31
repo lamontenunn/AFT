@@ -12,12 +12,15 @@ class AftEventCard extends StatelessWidget {
     required this.icon,
     required this.child,
     this.trailing,
+    this.leading,
   });
 
   final String title;
   final IconData icon;
   final Widget child;
   final Widget? trailing;
+  /// Optional custom leading widget (e.g., SVG). If provided, supersedes [icon].
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +37,7 @@ class AftEventCard extends StatelessWidget {
             // Header row
             Row(
               children: [
-                Icon(icon, color: cs.onSurfaceVariant),
+                leading ?? Icon(icon, color: cs.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
