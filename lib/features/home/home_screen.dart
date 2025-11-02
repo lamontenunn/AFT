@@ -748,7 +748,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                     label: 'Sprint-Drag-Carry',
                     seconds: curr,
                     config: cfg,
-                    reversed: true,
                     onChanged: (v) {
                       _sdcController.text = slidercfg.formatMmSs(v);
                       _onSdcChanged(_sdcController.text);
@@ -853,7 +852,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                     label: '2-Mile Run',
                     seconds: curr,
                     config: cfg,
-                    reversed: true,
                     onChanged: (v) {
                       _run2miController.text = slidercfg.formatMmSs(v);
                       _onRunChanged(_run2miController.text);

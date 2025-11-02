@@ -44,46 +44,56 @@ class AftScaffold extends ConsumerWidget {
             : NavigationDestinationLabelBehavior.onlyShowSelected;
 
     return Scaffold(
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        labelBehavior: navLabelBehavior,
-        onDestinationSelected: (int i) {
-          if (i == currentIndex) return;
-          if (settings.hapticsEnabled) {
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          backgroundColor: ArmyColors.gold,
+          indicatorColor: Colors.black12,
+          height: 44,
+          iconTheme: MaterialStateProperty.resolveWith((states) {
+            return IconThemeData(
+              size: 18,
+              color: states.contains(MaterialState.selected) ? Colors.black : Colors.black87,
+            );
+          }),
+        ),
+        child: NavigationBar(
+          selectedIndex: currentIndex,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+          onDestinationSelected: (int i) {
+            if (i == currentIndex) return;
             HapticFeedback.selectionClick();
-          }
-          final nextRoute = switch (i) {
-            0 => Routes.home,
-            1 => Routes.savedSets,
-            2 => Routes.standards,
-            3 => Routes.settings,
-            _ => Routes.home,
-          };
-          // Replace the current page in the stack when switching tabs
-          Navigator.of(context).pushReplacementNamed(nextRoute);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.calculate_outlined),
-            selectedIcon: Icon(Icons.calculate),
-            label: 'Calculator',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder),
-            label: 'Saved Sets',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.flag_outlined),
-            selectedIcon: Icon(Icons.flag),
-            label: 'Standards',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
+            final nextRoute = switch (i) {
+              0 => Routes.home,
+              1 => Routes.savedSets,
+              2 => Routes.standards,
+              3 => Routes.settings,
+              _ => Routes.home,
+            };
+            Navigator.of(context).pushReplacementNamed(nextRoute);
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.calculate_outlined),
+              selectedIcon: Icon(Icons.calculate),
+              label: 'Calculator',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.folder_outlined),
+              selectedIcon: Icon(Icons.folder),
+              label: 'Saved Sets',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.flag_outlined),
+              selectedIcon: Icon(Icons.flag),
+              label: 'Standards',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: 'Settings',
+            ),
+          ],
+        ),
       ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerScrolled) {
@@ -163,6 +173,7 @@ class _DomainSegmentedControl extends ConsumerWidget {
   }
 }
 
+
 class _ProfileButton extends ConsumerWidget {
   const _ProfileButton();
 
@@ -183,9 +194,15 @@ class _ProfileButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
 
-    return IconButton(
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: IconButton(
       tooltip: auth.isSignedIn ? 'Account' : 'Sign in to save scores',
-      icon: auth.isSignedIn
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+      alignment: Alignment.center,
+      splashRadius: 20,
+      icon: (auth.displayName != null && auth.displayName!.trim().isNotEmpty)
           ? CircleAvatar(
               radius: 12,
               child: Text(
@@ -195,6 +212,7 @@ class _ProfileButton extends ConsumerWidget {
             )
           : const Icon(Icons.person_outline),
       onPressed: () => _showProfileSheet(context, ref, auth),
+    ),
     );
   }
 
