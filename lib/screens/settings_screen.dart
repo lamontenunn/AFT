@@ -27,14 +27,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
 
-        // Haptics
-        SwitchListTile.adaptive(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          title: const Text('Enable haptics'),
-          value: settings.hapticsEnabled,
-          onChanged: (v) => ctrl.setHapticsEnabled(v),
-        ),
-        const Divider(height: 1),
 
         // Default profile
         Padding(
@@ -191,10 +183,18 @@ class SettingsScreen extends ConsumerWidget {
               title: Text('Version $version ($build)'),
               subtitle: const Text('AFT Calculator'),
               onTap: () {
-                showAboutDialog(
+                showDialog<void>(
                   context: context,
-                  applicationName: 'AFT Calculator',
-                  applicationVersion: '$version ($build)',
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('About'),
+                    content: const Text('Made by Nunn Technologies'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
                 );
               },
             );
