@@ -139,35 +139,52 @@ class _DomainSegmentedControl extends ConsumerWidget {
     final profile = ref.watch(aftProfileProvider);
     final selected = <AftStandard>{profile.standard};
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: SegmentedButton<AftStandard>(
-        style: ButtonStyle(
-          visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-          side: WidgetStateProperty.resolveWith((states) {
-            final outline = Theme.of(context).colorScheme.outline;
-            if (states.contains(WidgetState.focused)) {
-              return const BorderSide(color: ArmyColors.gold, width: 1.2);
-            }
-            return BorderSide(color: outline, width: 1);
-          }),
-        ),
-        segments: const [
-          ButtonSegment(
-            value: AftStandard.general,
-            label: Text('General'),
-          ),
-          ButtonSegment(
-            value: AftStandard.combat,
-            label: Text('Combat'),
-          ),
-        ],
-        selected: selected,
-        onSelectionChanged: (newSelection) {
-          if (newSelection.isEmpty) return;
-          final value = newSelection.first;
-          ref.read(aftProfileProvider.notifier).setStandard(value);
+    return SizedBox(
+      height: 36,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () {
+          final isCombat = profile.standard == AftStandard.combat;
+          final next = isCombat ? AftStandard.general : AftStandard.combat;
+          ref.read(aftProfileProvider.notifier).setStandard(next);
         },
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: profile.standard == AftStandard.combat
+                ? ArmyColors.gold
+                : Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: profile.standard == AftStandard.combat
+                  ? ArmyColors.gold
+                  : Theme.of(context).colorScheme.outline,
+              width: profile.standard == AftStandard.combat ? 1.4 : 1.0,
+            ),
+            boxShadow: profile.standard == AftStandard.combat
+                ? [
+                    BoxShadow(
+                      color: ArmyColors.gold.withOpacity(0.55),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Center(
+              child: Text(
+                'Combat',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: profile.standard == AftStandard.combat
+                          ? Colors.black
+                          : Theme.of(context).colorScheme.onSurface,
+                    ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
