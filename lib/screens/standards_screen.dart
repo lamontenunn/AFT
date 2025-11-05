@@ -4,24 +4,50 @@ import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/standards/state/standards_selection.dart';
 import 'package:aft_firebase_app/features/standards/providers.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
+import 'package:aft_firebase_app/features/standards/state/standards_scroll.dart';
 import 'dart:ui' show FontFeature;
 
 /// Standards screen:
 /// - Top pinned controls: Gender, Combat, Age Band, ALT Event (Off)
 /// - Table below: PTS | MDL | HRP | SDC | PLK | 2MR with rows 100 -> 0
-class StandardsScreen extends ConsumerWidget {
+class StandardsScreen extends ConsumerStatefulWidget {
   const StandardsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StandardsScreen> createState() => _StandardsScreenState();
+}
+
+class _StandardsScreenState extends ConsumerState<StandardsScreen> {
+  late final ScrollController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = ref.read(standardsScrollOffsetProvider);
+    _controller = ScrollController(initialScrollOffset: initial);
+    _controller.addListener(() {
+      ref.read(standardsScrollOffsetProvider.notifier).state = _controller.offset;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return CustomScrollView(
+      key: const PageStorageKey('standards-scroll'),
+      controller: _controller,
       slivers: [
         // Top pinned menu
         SliverPersistentHeader(
-          pinned: false,
+          pinned: true,
           delegate: _PinnedControlsDelegate(
-            minExtent: 80,
-            maxExtent: 112,
+            minExtent: 120,
+            maxExtent: 120,
             builder: (ctx) => const _TopControls(),
           ),
         ),
@@ -78,106 +104,115 @@ class _TopControls extends ConsumerWidget {
             border: Border.all(color: theme.colorScheme.outline.withOpacity(0.6), width: 1),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Gender (Male/Female)
-                SizedBox(
-                  height: kCtrlHeight,
-                  child: Opacity(
-                    opacity: disabledGender ? 0.5 : 1.0,
-                    child: SegmentedButton<AftSex>(
-                      style: _segmentedStyle(context),
-                      segments: const [
-                        ButtonSegment(value: AftSex.male, label: Text('Male')),
-                        ButtonSegment(value: AftSex.female, label: Text('Female')),
-                      ],
-                      selected: {sel.sex},
-                      onSelectionChanged: disabledGender
-                          ? null
-                          : (s) {
-                              if (s.isNotEmpty) ctrl.setSex(s.first);
-                            },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Combat (single toggle button)
-                SizedBox(
-                  height: kCtrlHeight,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: () => ctrl.setCombat(!sel.combat),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: sel.combat ? ArmyColors.gold : theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: sel.combat ? ArmyColors.gold : theme.colorScheme.outline,
-                          width: sel.combat ? 1.4 : 1.0,
-                        ),
-                        boxShadow: sel.combat
-                            ? [
-                                BoxShadow(
-                                  color: ArmyColors.gold.withOpacity(0.55),
-                                  blurRadius: 12,
-                                  spreadRadius: 1,
-                                ),
-                              ]
-                            : const [],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: Text(
-                            'Combat',
-                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: sel.combat ? Colors.black : theme.colorScheme.onSurface,
-                                ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SizedBox(
+                width: constraints.maxWidth,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Gender (Male/Female)
+                      SizedBox(
+                        height: kCtrlHeight,
+                        child: Opacity(
+                          opacity: disabledGender ? 0.5 : 1.0,
+                          child: SegmentedButton<AftSex>(
+                            style: _segmentedStyle(context),
+                            segments: const [
+                              ButtonSegment(value: AftSex.male, label: Text('Male')),
+                              ButtonSegment(value: AftSex.female, label: Text('Female')),
+                            ],
+                            selected: {sel.sex},
+                            onSelectionChanged: disabledGender
+                                ? null
+                                : (s) {
+                                    if (s.isNotEmpty) ctrl.setSex(s.first);
+                                  },
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Age band picker (pill)
-                SizedBox(
-                  height: kCtrlHeight,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      border: Border.all(color: theme.colorScheme.outline, width: 1),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: sel.ageBand,
-                          isDense: true,
-                          icon: const Icon(Icons.arrow_drop_down, size: 18),
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-                          items: bands
-                              .map((b) => DropdownMenuItem<String>(
-                                    value: b,
-                                    child: Text(b),
-                                  ))
-                              .toList(),
-                          onChanged: (b) {
-                            if (b != null) ctrl.setAgeBand(b);
-                          },
+                      const SizedBox(width: 12),
+                      // Combat (single toggle button)
+                      SizedBox(
+                        height: kCtrlHeight,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: () => ctrl.setCombat(!sel.combat),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: sel.combat ? ArmyColors.gold : theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: sel.combat ? ArmyColors.gold : theme.colorScheme.outline,
+                                width: sel.combat ? 1.4 : 1.0,
+                              ),
+                              boxShadow: sel.combat
+                                  ? [
+                                      BoxShadow(
+                                        color: ArmyColors.gold.withOpacity(0.55),
+                                        blurRadius: 12,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : const [],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'Combat',
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: sel.combat ? Colors.black : theme.colorScheme.onSurface,
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      // Age band picker (pill)
+                      SizedBox(
+                        height: kCtrlHeight,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surface,
+                            border: Border.all(color: theme.colorScheme.outline, width: 1),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: sel.ageBand,
+                                isDense: true,
+                                icon: const Icon(Icons.arrow_drop_down, size: 18),
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                                items: bands
+                                    .map((b) => DropdownMenuItem<String>(
+                                          value: b,
+                                          child: Text(b),
+                                        ))
+                                    .toList(),
+                                onChanged: (b) {
+                                  if (b != null) ctrl.setAgeBand(b);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
       ),
     ),
@@ -265,13 +300,17 @@ class _StandardsRows extends ConsumerWidget {
       itemBuilder: (ctx, i) {
         final r = rows[i];
         final isEven = i.isEven;
+        final bool isPassing = r.pts == 60;
+        final Color rowColor = isPassing
+            ? Color.alphaBlend(Colors.green.withOpacity(0.18), theme.colorScheme.surface)
+            : (isEven
+                ? theme.colorScheme.surface
+                : Color.alphaBlend(
+                    theme.colorScheme.onSurface.withOpacity(0.06),
+                    theme.colorScheme.surface,
+                  ));
         return Container(
-          color: isEven
-              ? theme.colorScheme.surface
-              : Color.alphaBlend(
-                  theme.colorScheme.onSurface.withOpacity(0.06),
-                  theme.colorScheme.surface,
-                ),
+          color: rowColor,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -403,7 +442,9 @@ class _PinnedControlsDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return builder(context);
+    // Ensure the header child expands to the sliver's current size to avoid
+    // "layoutExtent exceeds paintExtent" assertions in pinned headers.
+    return SizedBox.expand(child: builder(context));
   }
 
   @override
