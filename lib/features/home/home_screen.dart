@@ -204,13 +204,21 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
       }
     });
 
-    // Prefill Calculator profile from Settings defaults when not editing
+    // Prefill Calculator profile defaults and default test date when not editing
     if (!_prefillApplied) {
+      _prefillApplied = true;
       final settings = ref.read(settingsProvider);
-      if (settings.applyDefaultsOnCalculator && editing == null) {
-        _prefillApplied = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final prof = ref.read(aftProfileProvider.notifier);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final prof = ref.read(aftProfileProvider.notifier);
+        final currentProfile = ref.read(aftProfileProvider);
+
+        // Default test date to today if not set and not editing
+        if (editing == null && currentProfile.testDate == null) {
+          prof.setTestDate(DateTime.now());
+        }
+
+        // Apply other defaults only when enabled in Settings and not editing
+        if (settings.applyDefaultsOnCalculator && editing == null) {
           // Default birthdate -> compute age today
           final dob = settings.defaultBirthdate;
           if (dob != null) {
@@ -230,10 +238,8 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
           if (defSex != null) {
             prof.setSex(defSex);
           }
-        });
-      } else {
-        _prefillApplied = true;
-      }
+        }
+      });
     }
 
     return GestureDetector(
@@ -829,20 +835,47 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
             children: [
               Text('Time (mm:ss)', style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
-              TextField(
-                controller: _run2miController,
-                focusNode: _runFocus,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => FocusScope.of(context).unfocus(),
-                keyboardType: TextInputType.number,
-                inputFormatters: [MmSsFormatter()],
-                onChanged: _onRunChanged,
-                scrollPadding: const EdgeInsets.only(bottom: 80),
-                decoration: InputDecoration(
-                  labelText: '2-Mile Run time',
-                  hintText: 'e.g., 16:45',
-                  errorText: _run2miError,
-                ),
+              Builder(
+                builder: (context) {
+                  final cfg = slidercfg.getSliderConfig(profile.standard, profile, AftEvent.run2mi);
+                  final sec = inputs.run2mi?.inSeconds ?? parseMmSs(_run2miController.text)?.inSeconds ?? cfg.min.toInt();
+                  final curr = sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _run2miController,
+                          focusNode: _runFocus,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [MmSsFormatter()],
+                          onChanged: _onRunChanged,
+                          scrollPadding: const EdgeInsets.only(bottom: 80),
+                          decoration: InputDecoration(
+                            labelText: '2-Mile Run time',
+                            hintText: 'e.g., 16:45',
+                            errorText: _run2miError,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      AftStepper(
+                        value: curr,
+                        min: cfg.min.toInt(),
+                        max: cfg.max.toInt(),
+                        step: 1,
+                        displayFormatter: (v) => slidercfg.formatMmSs(v),
+                        semanticsLabel: '2-mile run time',
+                        onChanged: (v) {
+                          final clamped = v.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
+                          _run2miController.text = slidercfg.formatMmSs(clamped);
+                          _onRunChanged(_run2miController.text);
+                        },
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 8),
               Builder(

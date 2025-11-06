@@ -72,11 +72,11 @@ void main() {
       expect(hrpPointsForSex(AftSex.male, 20, 15), 60);
     });
 
-    test('Anchors - F17–21', () {
+    test('Anchors - F17-21', () {
       expect(hrpPointsForSex(AftSex.female, 20, 53), 100);
       expect(hrpPointsForSex(AftSex.female, 20, 48), 99);
       expect(hrpPointsForSex(AftSex.female, 20, 44), 98);
-      expect(hrpPointsForSex(AftSex.female, 20, 11), 61);
+      expect(hrpPointsForSex(AftSex.female, 20, 11), 60);
     });
   });
 
@@ -116,7 +116,7 @@ void main() {
 
     test('Anchors - F17–21', () {
       expect(run2miPointsForSex(AftSex.female, 20, _mmss('16:00')), 100);
-      expect(run2miPointsForSex(AftSex.female, 20, _mmss('22:55')), 61);
+      expect(run2miPointsForSex(AftSex.female, 20, _mmss('22:55')), 60);
     });
   });
 

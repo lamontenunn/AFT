@@ -13,6 +13,9 @@ class SettingsState {
   final bool hapticsEnabled;
   final NavLabelBehavior navBehavior;
 
+  // Theme
+  final ThemeMode themeMode;
+
   // Default profile settings
   final DateTime? defaultBirthdate;
   final AftSex? defaultSex;
@@ -21,6 +24,7 @@ class SettingsState {
   const SettingsState({
     required this.hapticsEnabled,
     required this.navBehavior,
+    required this.themeMode,
     this.defaultBirthdate,
     this.defaultSex,
     required this.applyDefaultsOnCalculator,
@@ -29,6 +33,7 @@ class SettingsState {
   SettingsState copyWith({
     bool? hapticsEnabled,
     NavLabelBehavior? navBehavior,
+    ThemeMode? themeMode,
     DateTime? defaultBirthdate,
     AftSex? defaultSex,
     bool? applyDefaultsOnCalculator,
@@ -38,6 +43,7 @@ class SettingsState {
     return SettingsState(
       hapticsEnabled: hapticsEnabled ?? this.hapticsEnabled,
       navBehavior: navBehavior ?? this.navBehavior,
+      themeMode: themeMode ?? this.themeMode,
       defaultBirthdate: clearBirthdate ? null : (defaultBirthdate ?? this.defaultBirthdate),
       defaultSex: clearSex ? null : (defaultSex ?? this.defaultSex),
       applyDefaultsOnCalculator:
@@ -48,6 +54,7 @@ class SettingsState {
   static const SettingsState defaults = SettingsState(
     hapticsEnabled: true,
     navBehavior: NavLabelBehavior.onlySelected,
+    themeMode: ThemeMode.dark,
     defaultBirthdate: null,
     defaultSex: null,
     applyDefaultsOnCalculator: true,
@@ -61,6 +68,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   static const _kHaptics = 'settings_hapticsEnabled';
   static const _kNavBehavior = 'settings_navLabelBehavior'; // 0: onlySelected, 1: always
+  static const _kThemeMode = 'settings_themeMode'; // 0: system, 1: light, 2: dark
   static const _kDefaultBirthdate = 'settings_defaultBirthdate'; // yyyy-MM-dd
   static const _kDefaultSex = 'settings_defaultSex'; // 'male' | 'female'
   static const _kPrefillCalc = 'settings_applyDefaultsOnCalculator';
@@ -71,6 +79,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     final haptics = prefs.getBool(_kHaptics);
     final navIdx = prefs.getInt(_kNavBehavior);
+    final themeIdx = prefs.getInt(_kThemeMode);
     final dobStr = prefs.getString(_kDefaultBirthdate);
     final sexStr = prefs.getString(_kDefaultSex);
     final prefill = prefs.getBool(_kPrefillCalc);
@@ -78,6 +87,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     state = state.copyWith(
       hapticsEnabled: haptics ?? SettingsState.defaults.hapticsEnabled,
       navBehavior: _fromIndex(navIdx ?? 0),
+      themeMode: _themeModeFromIndex(themeIdx ?? _themeModeToIndex(SettingsState.defaults.themeMode)),
       defaultBirthdate: _parseYmd(dobStr),
       defaultSex: _parseSex(sexStr),
       applyDefaultsOnCalculator:
@@ -95,6 +105,12 @@ class SettingsController extends StateNotifier<SettingsState> {
     state = state.copyWith(navBehavior: behavior);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_kNavBehavior, _toIndex(behavior));
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = state.copyWith(themeMode: mode);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kThemeMode, _themeModeToIndex(mode));
   }
 
   Future<void> setDefaultBirthdate(DateTime? dob) async {
@@ -140,6 +156,30 @@ class SettingsController extends StateNotifier<SettingsState> {
         return NavLabelBehavior.always;
       default:
         return SettingsState.defaults.navBehavior;
+    }
+  }
+
+  int _themeModeToIndex(ThemeMode m) {
+    switch (m) {
+      case ThemeMode.system:
+        return 0;
+      case ThemeMode.light:
+        return 1;
+      case ThemeMode.dark:
+        return 2;
+    }
+  }
+
+  ThemeMode _themeModeFromIndex(int i) {
+    switch (i) {
+      case 0:
+        return ThemeMode.system;
+      case 1:
+        return ThemeMode.light;
+      case 2:
+        return ThemeMode.dark;
+      default:
+        return SettingsState.defaults.themeMode;
     }
   }
 

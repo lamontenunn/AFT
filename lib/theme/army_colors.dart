@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class ArmyColors {
   // Brand
   static const Color black = Color(0xFF221F20); // Army Black
-  static const Color gold = Color(0xFFFFCC01); // Army Gold
+  static const Color gold = Color(0xFFFEC324); // Army Gold
   static const Color green = Color(0xFF2F372F); // Army Green
 
   // Neutrals
@@ -13,6 +13,7 @@ class ArmyColors {
 
 class ArmyNeutrals {
   // A practical neutral gray scale for dark UI outlines and text
+  static const Color eggshell = Color(0xFFFAF7F0);
   static const Color gray050 = Color(0xFFF2F2F2);
   static const Color gray100 = Color(0xFFE6E6E6);
   static const Color gray200 = Color(0xFFD1D1D1);
