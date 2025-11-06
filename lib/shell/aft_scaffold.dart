@@ -97,32 +97,31 @@ class AftScaffold extends ConsumerWidget {
       ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerScrolled) {
-          return showHeader ? [
+          // Route-based top app bar:
+          // - Standards: no top app bar
+          // - Others (Home, Saved Sets, Settings): small top app bar
+          if (routeName == Routes.standards) {
+            return [];
+          }
+          return [
             SliverAppBar(
-              pinned: false,
+              pinned: true,
+              toolbarHeight: 44,
+              backgroundColor: ArmyColors.gold,
+              foregroundColor: Colors.black,
+              elevation: 0,
               centerTitle: true,
-              title: const Text(
-                'AFT Calculator',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              title: const SizedBox.shrink(),
               actions: [
                 const _ProfileButton(),
                 const SizedBox(width: 8),
               ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(56),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-                  child: Center(child: _DomainSegmentedControl()),
-                ),
-              ),
             ),
-          ] : [];
+          ];
         },
         body: SafeArea(
-          // When there is no header (e.g., Saved Sets, Standards), respect top safe area
-          top: !showHeader,
+          // Add top inset for pages without a header sliver (e.g., Standards)
+          top: routeName == Routes.standards,
           bottom: true,
           child: child,
         ),

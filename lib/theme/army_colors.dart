@@ -14,6 +14,7 @@ class ArmyColors {
 class ArmyNeutrals {
   // A practical neutral gray scale for dark UI outlines and text
   static const Color eggshell = Color(0xFFFAF7F0);
+  static const Color bgDark = Color(0xFF20202C);
   static const Color gray050 = Color(0xFFF2F2F2);
   static const Color gray100 = Color(0xFFE6E6E6);
   static const Color gray200 = Color(0xFFD1D1D1);

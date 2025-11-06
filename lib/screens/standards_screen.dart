@@ -5,6 +5,7 @@ import 'package:aft_firebase_app/features/standards/state/standards_selection.da
 import 'package:aft_firebase_app/features/standards/providers.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
 import 'package:aft_firebase_app/features/standards/state/standards_scroll.dart';
+import 'package:aft_firebase_app/features/standards/combat_info_dialog.dart';
 import 'dart:ui' show FontFeature;
 
 /// Standards screen:
@@ -141,7 +142,13 @@ class _TopControls extends ConsumerWidget {
                         height: kCtrlHeight,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(999),
-                          onTap: () => ctrl.setCombat(!sel.combat),
+                          onTap: () async {
+                            final next = !sel.combat;
+                            if (next) {
+                              await maybeShowCombatInfoDialog(context, ref);
+                            }
+                            ctrl.setCombat(next);
+                          },
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               color: sel.combat ? ArmyColors.gold : theme.colorScheme.surface,
