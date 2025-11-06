@@ -16,6 +16,9 @@ class SettingsState {
   // Theme
   final ThemeMode themeMode;
 
+  // UI flags
+  final bool showCombatInfo;
+
   // Default profile settings
   final DateTime? defaultBirthdate;
   final AftSex? defaultSex;
@@ -25,6 +28,7 @@ class SettingsState {
     required this.hapticsEnabled,
     required this.navBehavior,
     required this.themeMode,
+    required this.showCombatInfo,
     this.defaultBirthdate,
     this.defaultSex,
     required this.applyDefaultsOnCalculator,
@@ -34,6 +38,7 @@ class SettingsState {
     bool? hapticsEnabled,
     NavLabelBehavior? navBehavior,
     ThemeMode? themeMode,
+    bool? showCombatInfo,
     DateTime? defaultBirthdate,
     AftSex? defaultSex,
     bool? applyDefaultsOnCalculator,
@@ -44,6 +49,7 @@ class SettingsState {
       hapticsEnabled: hapticsEnabled ?? this.hapticsEnabled,
       navBehavior: navBehavior ?? this.navBehavior,
       themeMode: themeMode ?? this.themeMode,
+      showCombatInfo: showCombatInfo ?? this.showCombatInfo,
       defaultBirthdate: clearBirthdate ? null : (defaultBirthdate ?? this.defaultBirthdate),
       defaultSex: clearSex ? null : (defaultSex ?? this.defaultSex),
       applyDefaultsOnCalculator:
@@ -55,6 +61,7 @@ class SettingsState {
     hapticsEnabled: true,
     navBehavior: NavLabelBehavior.onlySelected,
     themeMode: ThemeMode.dark,
+    showCombatInfo: true,
     defaultBirthdate: null,
     defaultSex: null,
     applyDefaultsOnCalculator: true,
@@ -69,6 +76,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   static const _kHaptics = 'settings_hapticsEnabled';
   static const _kNavBehavior = 'settings_navLabelBehavior'; // 0: onlySelected, 1: always
   static const _kThemeMode = 'settings_themeMode'; // 0: system, 1: light, 2: dark
+  static const _kShowCombatInfo = 'settings_showCombatInfo'; // bool
   static const _kDefaultBirthdate = 'settings_defaultBirthdate'; // yyyy-MM-dd
   static const _kDefaultSex = 'settings_defaultSex'; // 'male' | 'female'
   static const _kPrefillCalc = 'settings_applyDefaultsOnCalculator';
@@ -80,6 +88,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     final haptics = prefs.getBool(_kHaptics);
     final navIdx = prefs.getInt(_kNavBehavior);
     final themeIdx = prefs.getInt(_kThemeMode);
+    final showCombatInfo = prefs.getBool(_kShowCombatInfo);
     final dobStr = prefs.getString(_kDefaultBirthdate);
     final sexStr = prefs.getString(_kDefaultSex);
     final prefill = prefs.getBool(_kPrefillCalc);
@@ -88,6 +97,7 @@ class SettingsController extends StateNotifier<SettingsState> {
       hapticsEnabled: haptics ?? SettingsState.defaults.hapticsEnabled,
       navBehavior: _fromIndex(navIdx ?? 0),
       themeMode: _themeModeFromIndex(themeIdx ?? _themeModeToIndex(SettingsState.defaults.themeMode)),
+      showCombatInfo: showCombatInfo ?? SettingsState.defaults.showCombatInfo,
       defaultBirthdate: _parseYmd(dobStr),
       defaultSex: _parseSex(sexStr),
       applyDefaultsOnCalculator:
@@ -105,6 +115,12 @@ class SettingsController extends StateNotifier<SettingsState> {
     state = state.copyWith(navBehavior: behavior);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_kNavBehavior, _toIndex(behavior));
+  }
+
+  Future<void> setShowCombatInfo(bool show) async {
+    state = state.copyWith(showCombatInfo: show);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kShowCombatInfo, show);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

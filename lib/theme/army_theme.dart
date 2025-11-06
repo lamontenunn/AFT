@@ -148,7 +148,7 @@ class ArmyTheme {
       onPrimary: ArmyColors.black,
       secondary: ArmyColors.green,
       onSecondary: ArmyColors.white,
-      surface: ArmyColors.black,
+      surface: ArmyNeutrals.bgDark,
       onSurface: ArmyNeutrals.gray100,
       error: const Color(0xFFCF6679),
       outline: ArmyNeutrals.gray500,
@@ -180,7 +180,7 @@ class ArmyTheme {
       brightness: Brightness.dark,
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: ArmyColors.black,
+      scaffoldBackgroundColor: ArmyNeutrals.bgDark,
       textTheme: textTheme,
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
