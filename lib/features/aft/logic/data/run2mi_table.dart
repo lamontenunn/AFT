@@ -159,10 +159,17 @@ int run2miPointsForSex(AftSex sex, int age, Duration time) {
   final secs = time.inSeconds;
 
   for (var p = 100; p >= 0; p--) {
-    final reqSecs = dense[100 - p][ageIdx];
-    if (secs <= reqSecs) {
-      return p;
+    final idx = 100 - p;
+    final req = dense[idx][ageIdx];
+
+    if (secs > req) continue; // not fast enough at this P
+
+    if (secs == req && p > 0) {
+      final nextReq = dense[idx + 1][ageIdx]; // P-1
+      if (nextReq == req) continue;
     }
+    return p;
   }
   return 0;
 }
+
