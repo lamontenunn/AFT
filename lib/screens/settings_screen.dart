@@ -176,6 +176,22 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         const Divider(height: 1),
 
+        // Popups & tips
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            'Popups & tips',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        SwitchListTile.adaptive(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          title: const Text('Show Combat info popup'),
+          value: settings.showCombatInfo,
+          onChanged: (v) => ctrl.setShowCombatInfo(v),
+        ),
+        const Divider(height: 1),
+
         // Data management
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),

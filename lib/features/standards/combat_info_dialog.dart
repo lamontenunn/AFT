@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Shows the Combat MOS info dialog if the user hasn't disabled it.
 /// Uses Material 3 AlertDialog with scrollable content and a "Don't show again" option.
@@ -16,7 +17,7 @@ Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) asyn
       final theme = Theme.of(ctx);
       return StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: const Text('Combat MOS (AFT)'),
+          title: const Text('Classified Combat MOSs:'),
           content: ConstrainedBox(
             constraints: BoxConstraints(
               // Keep dialog content within a comfortable viewport height
@@ -27,7 +28,9 @@ Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) asyn
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('The following MOSs are all classified as combat for AFT purposes:'),
+                  const Text(
+                    'The following MOSs are all classified as combat for AFT purposes:',
+                  ),
                   const SizedBox(height: 12),
                   ..._combatItems.map(
                     (e) => Padding(
@@ -48,9 +51,12 @@ Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) asyn
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Close'),
+            TextButton.icon(
+              onPressed: () async {
+                await _openAftFaq();
+              },
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Learn more'),
             ),
             FilledButton(
               onPressed: () async {
@@ -66,6 +72,15 @@ Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) asyn
       );
     },
   );
+}
+
+Future<void> _openAftFaq() async {
+  final uri = Uri.parse('https://www.army.mil/aft/#faq');
+  try {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    // Silently ignore launch failures.
+  }
 }
 
 const List<String> _combatItems = [
