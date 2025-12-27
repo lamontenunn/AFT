@@ -81,7 +81,12 @@ class StandardsSelectionNotifier extends Notifier<StandardsSelection> {
   }
 
   void setCombat(bool on) {
-    state = state.copyWith(combat: on);
+    // Combat standards force male scoring tables.
+    // We hard-set sex to male when Combat is enabled to keep UI + state consistent.
+    state = state.copyWith(
+      combat: on,
+      sex: on ? AftSex.male : state.sex,
+    );
   }
 
   void setAgeBand(String band) {

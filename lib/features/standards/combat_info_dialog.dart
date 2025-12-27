@@ -17,7 +17,7 @@ Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) asyn
       final theme = Theme.of(ctx);
       return StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: const Text('Classified Combat MOSs:'),
+          title: const Text('Combat MOS List:'),
           content: ConstrainedBox(
             constraints: BoxConstraints(
               // Keep dialog content within a comfortable viewport height
