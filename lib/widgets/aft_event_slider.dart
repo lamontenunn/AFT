@@ -2,7 +2,79 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:aft_firebase_app/features/aft/logic/slider_config.dart';
 
-class AftIntSlider extends StatelessWidget {
+class _TickBar extends StatelessWidget {
+  const _TickBar({
+    required this.min,
+    required this.max,
+    this.thresholds,
+    this.formatLabel,
+  });
+  final double min;
+  final double max;
+  final ScoreThresholds? thresholds;
+  final String Function(int)? formatLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    if (thresholds == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final width = 260.0; // compact non-interactive bar width
+    final height = 12.0;
+
+    double pos(int v) => ((v - min) / (max - min)).clamp(0, 1);
+
+    return Semantics(
+      label: 'Threshold ticks',
+      hint: formatLabel == null
+          ? 'Ticks at 60, 90, 100 points'
+          : 'Ticks at 60, 90, 100 points: '
+              '${formatLabel!(thresholds!.p60)}, '
+              '${formatLabel!(thresholds!.p90)}, '
+              '${formatLabel!(thresholds!.p100)}',
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: CustomPaint(
+          painter: _TickPainter(
+            positions: [
+              pos(thresholds!.p60),
+              pos(thresholds!.p90),
+              pos(thresholds!.p100),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TickPainter extends CustomPainter {
+  _TickPainter({required this.positions});
+  final List<double> positions; // 0..1
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final track = Paint()
+      ..color = Colors.black.withOpacity(0.12)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    final dot = Paint()
+      ..color = Colors.black.withOpacity(0.45);
+
+    final y = size.height / 2;
+    canvas.drawLine(Offset(0, y), Offset(size.width, y), track);
+
+    for (final p in positions) {
+      final x = p * size.width;
+      canvas.drawCircle(Offset(x, y), 2.5, dot);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TickPainter old) => old.positions != positions;
+}
+
+class AftIntSlider extends StatefulWidget {
   const AftIntSlider({
     super.key,
     required this.label,
@@ -10,6 +82,7 @@ class AftIntSlider extends StatelessWidget {
     required this.config,
     required this.onChanged,
     this.suffix,
+    this.thresholds,
   });
 
   final String label;
@@ -17,35 +90,51 @@ class AftIntSlider extends StatelessWidget {
   final SliderConfig config;
   final ValueChanged<int> onChanged;
   final String? suffix;
+  final ScoreThresholds? thresholds;
+
+  @override
+  State<AftIntSlider> createState() => _AftIntSliderState();
+}
+
+class _AftIntSliderState extends State<AftIntSlider> {
+  int _bucketFor(int v) {
+    final t = widget.thresholds;
+    if (t == null) return -1;
+    if (v >= t.p100) return 100;
+    if (v >= t.p90) return 90;
+    if (v >= t.p60) return 60;
+    return 0;
+  }
+
+  int? _lastBucket;
 
   int _snap(double v) {
-    final step = config.step;
-    final min = config.min;
+    final step = widget.config.step;
+    final min = widget.config.min;
     final snapped = min + (((v - min) / step).round() * step);
-    return snapped.clamp(min, config.max).toInt();
+    return snapped.clamp(min, widget.config.max).toInt();
   }
 
   @override
   Widget build(BuildContext context) {
-    assert(config.domain == SliderDomainType.integer);
+    assert(widget.config.domain == SliderDomainType.integer);
     final theme = Theme.of(context);
-    final min = config.min;
-    final max = config.max;
-    final int? divisions = config.divisions; // discrete ticks to ensure endpoints are reachable
+    final min = widget.config.min;
+    final max = widget.config.max;
+    final int? divisions = widget.config.divisions;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header row with current value
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: theme.textTheme.bodyMedium),
+            Text(widget.label, style: theme.textTheme.bodyMedium),
             Semantics(
-              label: label,
-              value: suffix == null ? '$value' : '$value $suffix',
+              label: widget.label,
+              value: widget.suffix == null ? '${widget.value}' : '${widget.value} ${widget.suffix}',
               child: Text(
-                suffix == null ? '$value' : '$value $suffix',
+                widget.suffix == null ? '${widget.value}' : '${widget.value} ${widget.suffix}',
                 style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
@@ -56,21 +145,39 @@ class AftIntSlider extends StatelessWidget {
             showValueIndicator: ShowValueIndicator.always,
           ),
           child: Slider(
-            value: value.clamp(min.toInt(), max.toInt()).toDouble(),
+            value: widget.value.clamp(min.toInt(), max.toInt()).toDouble(),
             min: min,
             max: max,
             divisions: divisions,
-            label: suffix == null ? '$value' : '$value $suffix',
-            onChanged: (v) => onChanged(_snap(v)),
+            label: widget.suffix == null ? '${widget.value}' : '${widget.value} ${widget.suffix}',
+            onChanged: (v) {
+              final snapped = _snap(v);
+              final b = _bucketFor(snapped);
+              if (b != _lastBucket && b != -1) {
+                if (b == 100) HapticFeedback.lightImpact();
+                else HapticFeedback.selectionClick();
+                _lastBucket = b;
+              }
+              widget.onChanged(snapped);
+            },
           ),
         ),
-        // Min/Max labels
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _TickBar(
+            min: min,
+            max: max,
+            thresholds: widget.thresholds,
+          ),
+        ),
+        const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(suffix == null ? '${min.toInt()}' : '${min.toInt()} $suffix',
+            Text(widget.suffix == null ? '${min.toInt()}' : '${min.toInt()} ${widget.suffix}',
                 style: theme.textTheme.labelSmall),
-            Text(suffix == null ? '${max.toInt()}' : '${max.toInt()} $suffix',
+            Text(widget.suffix == null ? '${max.toInt()}' : '${max.toInt()} ${widget.suffix}',
                 style: theme.textTheme.labelSmall),
           ],
         ),
@@ -79,7 +186,7 @@ class AftIntSlider extends StatelessWidget {
   }
 }
 
-class AftTimeSlider extends StatelessWidget {
+class AftTimeSlider extends StatefulWidget {
   const AftTimeSlider({
     super.key,
     required this.label,
@@ -87,6 +194,7 @@ class AftTimeSlider extends StatelessWidget {
     required this.config,
     required this.onChanged,
     this.reversed = false,
+    this.thresholds,
   });
 
   final String label;
@@ -94,41 +202,63 @@ class AftTimeSlider extends StatelessWidget {
   final SliderConfig config;
   final ValueChanged<int> onChanged;
   final bool reversed;
+  final ScoreThresholds? thresholds;
+
+  @override
+  State<AftTimeSlider> createState() => _AftTimeSliderState();
+}
+
+class _AftTimeSliderState extends State<AftTimeSlider> {
+  int _bucketFor(int v) {
+    final t = widget.thresholds;
+    if (t == null) return -1;
+    if (widget.reversed) { // lower is better
+      if (v <= t.p100) return 100;
+      if (v <= t.p90) return 90;
+      if (v <= t.p60) return 60;
+      return 0;
+    } else { // higher is better (plank)
+      if (v >= t.p100) return 100;
+      if (v >= t.p90) return 90;
+      if (v >= t.p60) return 60;
+      return 0;
+    }
+  }
+
+  int? _lastBucket;
 
   int _snap(double v) {
-    final step = config.step;
-    final min = config.min;
+    final step = widget.config.step;
+    final min = widget.config.min;
     final snapped = min + (((v - min) / step).round() * step);
-    return snapped.clamp(min, config.max).toInt();
+    return snapped.clamp(min, widget.config.max).toInt();
   }
 
   @override
   Widget build(BuildContext context) {
-    assert(config.domain == SliderDomainType.timeSeconds);
+    assert(widget.config.domain == SliderDomainType.timeSeconds);
     final theme = Theme.of(context);
-    final min = config.min;
-    final max = config.max;
-    // Use 1-second tick granularity so endpoints are exactly reachable,
-    // while still snapping to config.step in onChanged.
+    final min = widget.config.min;
+    final max = widget.config.max;
     final int divisions = (max - min).toInt();
 
-    final clamped = seconds.clamp(min.toInt(), max.toInt());
-    // UI value mapping: when reversed, rightward drag lowers time (higher score).
-    final double uiValue = reversed ? (min + max - clamped) : clamped.toDouble();
+    final clamped = widget.seconds.clamp(min.toInt(), max.toInt());
+    final double uiValue = widget.reversed ? (min + max - clamped) : clamped.toDouble();
+
+    String format(int s) => formatMmSs(s);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header row with current value
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: theme.textTheme.bodyMedium),
+            Text(widget.label, style: theme.textTheme.bodyMedium),
             Semantics(
-              label: label,
-              value: formatMmSs(clamped),
+              label: widget.label,
+              value: format(clamped),
               child: Text(
-                formatMmSs(clamped),
+                format(clamped),
                 style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
@@ -143,26 +273,40 @@ class AftTimeSlider extends StatelessWidget {
             min: min,
             max: max,
             divisions: divisions,
-            label: formatMmSs(clamped),
+            label: format(clamped),
             onChanged: (v) {
-              // Snap in the seconds domain so endpoints (min/max) are always reachable,
-              // then apply clamping. Do the reverse mapping BEFORE snapping.
-              final secondsRaw = reversed ? (min + max - v) : v;
+              final secondsRaw = widget.reversed ? (min + max - v) : v;
               final snapped = _snap(secondsRaw);
-              onChanged(snapped);
+              final b = _bucketFor(snapped);
+              if (b != _lastBucket && b != -1) {
+                if (b == 100) HapticFeedback.lightImpact();
+                else HapticFeedback.selectionClick();
+                _lastBucket = b;
+              }
+              widget.onChanged(snapped);
             },
           ),
         ),
-        // Min/Max labels
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _TickBar(
+            min: widget.reversed ? min : min,
+            max: widget.reversed ? max : max,
+            thresholds: widget.thresholds,
+            formatLabel: (s) => format(s),
+          ),
+        ),
+        const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              reversed ? formatMmSs(max.toInt()) : formatMmSs(min.toInt()),
+              widget.reversed ? format(max.toInt()) : format(min.toInt()),
               style: theme.textTheme.labelSmall,
             ),
             Text(
-              reversed ? formatMmSs(min.toInt()) : formatMmSs(max.toInt()),
+              widget.reversed ? format(min.toInt()) : format(max.toInt()),
               style: theme.textTheme.labelSmall,
             ),
           ],

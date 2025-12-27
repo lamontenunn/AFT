@@ -102,3 +102,20 @@ final aftComputedProvider = Provider<AftComputed>((ref) {
     total: total,
   );
 });
+
+/// Effective standard targets for UI (total target and per-event minimum)
+class EffectiveStandard {
+  final int totalTarget; // 300 for general, 350 for combat
+  final int minPerEvent; // always 60
+
+  const EffectiveStandard({
+    required this.totalTarget,
+    required this.minPerEvent,
+  });
+}
+
+final effectiveStandardProvider = Provider<EffectiveStandard>((ref) {
+  final profile = ref.watch(aftProfileProvider);
+  final total = profile.standard == AftStandard.combat ? 350 : 300;
+  return EffectiveStandard(totalTarget: total, minPerEvent: 60);
+});
