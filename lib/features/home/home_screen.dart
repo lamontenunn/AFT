@@ -572,12 +572,17 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                             child: InkWell(
                               borderRadius: BorderRadius.circular(999),
                               onTap: () async {
-                                final isCombat = profile.standard == AftStandard.combat;
-                                final next = isCombat ? AftStandard.general : AftStandard.combat;
+                                final isCombat =
+                                    profile.standard == AftStandard.combat;
+                                final next = isCombat
+                                    ? AftStandard.general
+                                    : AftStandard.combat;
                                 if (next == AftStandard.combat) {
                                   await maybeShowCombatInfoDialog(context, ref);
                                 }
-                                ref.read(aftProfileProvider.notifier).setStandard(next);
+                                ref
+                                    .read(aftProfileProvider.notifier)
+                                    .setStandard(next);
                                 HapticFeedback.selectionClick();
                               },
                               child: DecoratedBox(
@@ -587,29 +592,38 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                       : theme.colorScheme.surface,
                                   borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: profile.standard == AftStandard.combat
-                                        ? ArmyColors.gold
-                                        : theme.colorScheme.outline,
-                                    width: profile.standard == AftStandard.combat ? 1.4 : 1.0,
+                                    color:
+                                        profile.standard == AftStandard.combat
+                                            ? ArmyColors.gold
+                                            : theme.colorScheme.outline,
+                                    width:
+                                        profile.standard == AftStandard.combat
+                                            ? 1.4
+                                            : 1.0,
                                   ),
-                                  boxShadow: profile.standard == AftStandard.combat
-                                      ? [
-                                          BoxShadow(
-                                            color: ArmyColors.gold.withOpacity(0.55),
-                                            blurRadius: 12,
-                                            spreadRadius: 1,
-                                          ),
-                                        ]
-                                      : const [],
+                                  boxShadow:
+                                      profile.standard == AftStandard.combat
+                                          ? [
+                                              BoxShadow(
+                                                color: ArmyColors.gold
+                                                    .withOpacity(0.55),
+                                                blurRadius: 12,
+                                                spreadRadius: 1,
+                                              ),
+                                            ]
+                                          : const [],
                                 ),
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
                                   child: Center(
                                     child: Text(
                                       'Combat',
-                                      style: theme.textTheme.labelMedium?.copyWith(
+                                      style:
+                                          theme.textTheme.labelMedium?.copyWith(
                                         fontWeight: FontWeight.w600,
-                                        color: profile.standard == AftStandard.combat
+                                        color: profile.standard ==
+                                                AftStandard.combat
                                             ? Colors.black
                                             : theme.colorScheme.onSurface,
                                       ),
@@ -747,6 +761,11 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                         value: curr,
                         suffix: 'lbs',
                         config: cfg,
+                        thresholds: slidercfg.getScoreThresholds(
+                          profile.standard,
+                          profile,
+                          AftEvent.mdl,
+                        ),
                         onChanged: (v) {
                           _mdlController.text = '$v';
                           _onMdlChanged(_mdlController.text);
@@ -823,6 +842,11 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                         label: 'Repetitions',
                         value: curr,
                         config: cfg,
+                        thresholds: slidercfg.getScoreThresholds(
+                          profile.standard,
+                          profile,
+                          AftEvent.pushUps,
+                        ),
                         onChanged: (v) {
                           _puController.text = '$v';
                           _onPuChanged(_puController.text);
@@ -874,13 +898,19 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                           profile.standard, profile, AftEvent.sdc);
                       final sec = inputs.sdc?.inSeconds ??
                           parseMmSs(_sdcController.text)?.inSeconds ??
-                          cfg.min.toInt();
+                          cfg.max.toInt();
                       final curr =
                           sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
                       return AftTimeSlider(
                         label: 'Sprint-Drag-Carry',
                         seconds: curr,
                         config: cfg,
+                        reversed: true,
+                        thresholds: slidercfg.getScoreThresholds(
+                          profile.standard,
+                          profile,
+                          AftEvent.sdc,
+                        ),
                         onChanged: (v) {
                           _sdcController.text = slidercfg.formatMmSs(v);
                           _onSdcChanged(_sdcController.text);
@@ -939,6 +969,11 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                         label: 'Plank',
                         seconds: curr,
                         config: cfg,
+                        thresholds: slidercfg.getScoreThresholds(
+                          profile.standard,
+                          profile,
+                          AftEvent.plank,
+                        ),
                         onChanged: (v) {
                           _plankController.text = slidercfg.formatMmSs(v);
                           _onPlankChanged(_plankController.text);
@@ -973,7 +1008,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                           profile.standard, profile, AftEvent.run2mi);
                       final sec = inputs.run2mi?.inSeconds ??
                           parseMmSs(_run2miController.text)?.inSeconds ??
-                          cfg.min.toInt();
+                          cfg.max.toInt();
                       final curr =
                           sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
                       return Row(
@@ -1024,13 +1059,19 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                           profile.standard, profile, AftEvent.run2mi);
                       final sec = inputs.run2mi?.inSeconds ??
                           parseMmSs(_run2miController.text)?.inSeconds ??
-                          cfg.min.toInt();
+                          cfg.max.toInt();
                       final curr =
                           sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
                       return AftTimeSlider(
                         label: '2-Mile Run',
                         seconds: curr,
                         config: cfg,
+                        reversed: true,
+                        thresholds: slidercfg.getScoreThresholds(
+                          profile.standard,
+                          profile,
+                          AftEvent.run2mi,
+                        ),
                         onChanged: (v) {
                           _run2miController.text = slidercfg.formatMmSs(v);
                           _onRunChanged(_run2miController.text);

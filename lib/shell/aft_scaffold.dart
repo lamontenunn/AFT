@@ -31,8 +31,8 @@ class AftScaffold extends ConsumerWidget {
     final routeName = ModalRoute.of(context)?.settings.name ?? Routes.home;
     final int currentIndex = switch (routeName) {
       Routes.home => 0,
-      Routes.savedSets => 1,
-      Routes.standards => 2,
+      Routes.standards => 1,
+      Routes.savedSets => 2,
       Routes.settings => 3,
       _ => 0,
     };
@@ -64,8 +64,8 @@ class AftScaffold extends ConsumerWidget {
             HapticFeedback.selectionClick();
             final nextRoute = switch (i) {
               0 => Routes.home,
-              1 => Routes.savedSets,
-              2 => Routes.standards,
+              1 => Routes.standards,
+              2 => Routes.savedSets,
               3 => Routes.settings,
               _ => Routes.home,
             };
@@ -78,14 +78,14 @@ class AftScaffold extends ConsumerWidget {
               label: 'Calculator',
             ),
             NavigationDestination(
-              icon: Icon(Icons.folder_outlined),
-              selectedIcon: Icon(Icons.folder),
-              label: 'Saved Sets',
-            ),
-            NavigationDestination(
               icon: Icon(Icons.flag_outlined),
               selectedIcon: Icon(Icons.flag),
               label: 'Standards',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.folder_outlined),
+              selectedIcon: Icon(Icons.folder),
+              label: 'Saved Sets',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),

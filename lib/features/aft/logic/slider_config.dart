@@ -9,6 +9,77 @@ import 'package:aft_firebase_app/features/aft/logic/data/run2mi_table.dart';
 
 enum SliderDomainType { integer, timeSeconds }
 
+/// Score thresholds (values at which you reach these point levels)
+class ScoreThresholds {
+  final int p60;
+  final int p90;
+  final int p100;
+  const ScoreThresholds({required this.p60, required this.p90, required this.p100});
+}
+
+int _findIntMinForPoints(int Function(AftSex,int,int) scorer, AftSex sex, int age, int target) {
+  for (int v = 0; v <= 1000; v++) {
+    if (scorer(sex, age, v) >= target) return v;
+  }
+  return 0;
+}
+
+int _findTimeMaxForPointsLowerIsBetter(int Function(AftSex,int,Duration) scorer, AftSex sex, int age, int target) {
+  int lastOk = 0;
+  for (int t = 0; t <= 60 * 60; t++) {
+    if (scorer(sex, age, Duration(seconds: t)) >= target) {
+      lastOk = t;
+    } else if (lastOk > 0) {
+      break;
+    }
+  }
+  return lastOk;
+}
+
+int _findTimeMinForPointsHigherIsBetter(int Function(AftSex,int,Duration) scorer, AftSex sex, int age, int target) {
+  for (int t = 0; t <= 60 * 60; t++) {
+    if (scorer(sex, age, Duration(seconds: t)) >= target) return t;
+  }
+  return 0;
+}
+
+ScoreThresholds getScoreThresholds(AftStandard standard, AftProfile profile, AftEvent event) {
+  final sex = _effectiveSex(standard, profile.sex);
+  final age = profile.age;
+  switch (event) {
+    case AftEvent.mdl:
+      return ScoreThresholds(
+        p60: _findIntMinForPoints(mdlPointsForSex, sex, age, 60),
+        p90: _findIntMinForPoints(mdlPointsForSex, sex, age, 90),
+        p100: _findIntMinForPoints(mdlPointsForSex, sex, age, 100),
+      );
+    case AftEvent.pushUps:
+      return ScoreThresholds(
+        p60: _findIntMinForPoints(hrpPointsForSex, sex, age, 60),
+        p90: _findIntMinForPoints(hrpPointsForSex, sex, age, 90),
+        p100: _findIntMinForPoints(hrpPointsForSex, sex, age, 100),
+      );
+    case AftEvent.sdc:
+      return ScoreThresholds(
+        p60: _findTimeMaxForPointsLowerIsBetter(sdcPointsForSex, sex, age, 60),
+        p90: _findTimeMaxForPointsLowerIsBetter(sdcPointsForSex, sex, age, 90),
+        p100: _findTimeMaxForPointsLowerIsBetter(sdcPointsForSex, sex, age, 100),
+      );
+    case AftEvent.plank:
+      return ScoreThresholds(
+        p60: _findTimeMinForPointsHigherIsBetter(plkPointsForSex, sex, age, 60),
+        p90: _findTimeMinForPointsHigherIsBetter(plkPointsForSex, sex, age, 90),
+        p100: _findTimeMinForPointsHigherIsBetter(plkPointsForSex, sex, age, 100),
+      );
+    case AftEvent.run2mi:
+      return ScoreThresholds(
+        p60: _findTimeMaxForPointsLowerIsBetter(run2miPointsForSex, sex, age, 60),
+        p90: _findTimeMaxForPointsLowerIsBetter(run2miPointsForSex, sex, age, 90),
+        p100: _findTimeMaxForPointsLowerIsBetter(run2miPointsForSex, sex, age, 100),
+      );
+  }
+}
+
 class SliderConfig {
   final double min;
   final double max;
