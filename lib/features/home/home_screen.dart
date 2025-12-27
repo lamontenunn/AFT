@@ -23,6 +23,7 @@ import 'package:aft_firebase_app/router/app_router.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:aft_firebase_app/widgets/aft_svg_icon.dart';
 import 'package:aft_firebase_app/features/standards/combat_info_dialog.dart';
+import 'package:aft_firebase_app/features/saves/saved_test_dialog.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
@@ -176,6 +177,16 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     final auth = ref.watch(authStateProvider);
     final bool canSave = auth.isSignedIn && computed.total != null;
 
+    // Fail rule: if any *known* event score is < 60.
+    // (We ignore null scores so missing inputs don't immediately show as failing.)
+    final bool isFail = [
+      computed.mdlScore,
+      computed.pushUpsScore,
+      computed.sdcScore,
+      computed.plankScore,
+      computed.run2miScore,
+    ].any((s) => s != null && s < 60);
+
     // React to Settings changes while on Calculator (apply defaults when not editing)
     ref.listen<SettingsState>(settingsProvider, (prev, next) {
       final editingNow = ref.read(editingSetProvider);
@@ -273,6 +284,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w700,
+                              color: isFail ? Colors.red : cs.onSurface,
                             ),
                           ),
                         ),
@@ -363,7 +375,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                       Tooltip(
                         message: auth.isSignedIn
                             ? (editing != null
-                                ? 'Update saved set'
+                                ? 'Update saved test'
                                 : 'Save results')
                             : 'Sign in to save results',
                         preferBelow: false,
@@ -400,84 +412,100 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                         .read(editingSetProvider.notifier)
                                         .state = null;
                                     if (context.mounted) {
-                                      final testDateLabel =
-                                          profileNow.testDate == null
-                                              ? '—'
-                                              : formatYmd(profileNow.testDate!);
-                                      final totalLabel =
-                                          computedNow.total?.toString() ?? '—';
-                                      await showDialog<void>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: const Text('Test updated'),
-                                          content: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text('Test date: $testDateLabel'),
-                                              Text('Total: $totalLabel'),
-                                            ],
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(),
-                                              child: const Text('Close'),
+                                      await showSavedTestDialog(
+                                        context,
+                                        set: set,
+                                        onEdit: () {
+                                          // Already on calculator in editing context.
+                                        },
+                                        onDelete: () async {
+                                          final ok = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text(
+                                                  'Delete this saved test?'),
+                                              content: const Text(
+                                                  'This cannot be undone.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(ctx)
+                                                          .pop(false),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                FilledButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(ctx)
+                                                          .pop(true),
+                                                  child: const Text('Delete'),
+                                                ),
+                                              ],
                                             ),
-                                            FilledButton(
-                                              onPressed: () {
-                                                Navigator.of(ctx).pop();
-                                                Navigator.pushNamed(
-                                                    context, Routes.savedSets);
-                                              },
-                                              child:
-                                                  const Text('View saved sets'),
-                                            ),
-                                          ],
-                                        ),
+                                          );
+                                          if (ok == true) {
+                                            await repo.deleteScoreSet(
+                                              userId: userId,
+                                              id: set.id,
+                                            );
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                    content: Text('Deleted')),
+                                              );
+                                            }
+                                          }
+                                        },
                                       );
                                     }
                                   } else {
                                     await repo.saveScoreSet(
                                         userId: userId, set: set);
                                     if (context.mounted) {
-                                      final testDateLabel =
-                                          profileNow.testDate == null
-                                              ? '—'
-                                              : formatYmd(profileNow.testDate!);
-                                      final totalLabel =
-                                          computedNow.total?.toString() ?? '—';
-                                      await showDialog<void>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: const Text('Test saved'),
-                                          content: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text('Test date: $testDateLabel'),
-                                              Text('Total: $totalLabel'),
-                                            ],
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(),
-                                              child: const Text('Close'),
+                                      await showSavedTestDialog(
+                                        context,
+                                        set: set,
+                                        onEdit: () {
+                                          // Already on calculator.
+                                        },
+                                        onDelete: () async {
+                                          final ok = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text(
+                                                  'Delete this saved test?'),
+                                              content: const Text(
+                                                  'This cannot be undone.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(ctx)
+                                                          .pop(false),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                FilledButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(ctx)
+                                                          .pop(true),
+                                                  child: const Text('Delete'),
+                                                ),
+                                              ],
                                             ),
-                                            FilledButton(
-                                              onPressed: () {
-                                                Navigator.of(ctx).pop();
-                                                Navigator.pushNamed(
-                                                    context, Routes.savedSets);
-                                              },
-                                              child:
-                                                  const Text('View saved sets'),
-                                            ),
-                                          ],
-                                        ),
+                                          );
+                                          if (ok == true) {
+                                            await repo.deleteScoreSet(
+                                              userId: userId,
+                                              id: set.id,
+                                            );
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                    content: Text('Deleted')),
+                                              );
+                                            }
+                                          }
+                                        },
                                       );
                                     }
                                   }

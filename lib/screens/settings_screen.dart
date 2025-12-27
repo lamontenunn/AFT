@@ -23,16 +23,19 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Text(
             'Settings',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
-
 
         // Coming soon banner (Theme toggle temporarily disabled)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Card(
-            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
+            color:
+                Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
             elevation: 0,
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -57,7 +60,10 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             'Appearance',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         Padding(
@@ -80,7 +86,10 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             'Default profile',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         ListTile(
@@ -90,16 +99,17 @@ class SettingsScreen extends ConsumerWidget {
             settings.defaultBirthdate == null
                 ? 'Not set'
                 : '${settings.defaultBirthdate!.year.toString().padLeft(4, '0')}-'
-                  '${settings.defaultBirthdate!.month.toString().padLeft(2, '0')}-'
-                  '${settings.defaultBirthdate!.day.toString().padLeft(2, '0')}'
-                  '  (Age today: ${_ageFromDob(settings.defaultBirthdate!)})',
+                    '${settings.defaultBirthdate!.month.toString().padLeft(2, '0')}-'
+                    '${settings.defaultBirthdate!.day.toString().padLeft(2, '0')}'
+                    '  (Age today: ${_ageFromDob(settings.defaultBirthdate!)})',
           ),
           trailing: Wrap(
             spacing: 8,
             children: [
               TextButton(
                 onPressed: () async {
-                  final initial = settings.defaultBirthdate ?? DateTime(DateTime.now().year - 25, 1, 1);
+                  final initial = settings.defaultBirthdate ??
+                      DateTime(DateTime.now().year - 25, 1, 1);
                   final picked = await showDatePicker(
                     context: context,
                     initialDate: initial,
@@ -155,15 +165,21 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             'Bottom navigation labels',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SegmentedButton<NavLabelBehavior>(
             segments: const [
-              ButtonSegment(value: NavLabelBehavior.onlySelected, label: Text('Only selected')),
-              ButtonSegment(value: NavLabelBehavior.always, label: Text('Always show')),
+              ButtonSegment(
+                  value: NavLabelBehavior.onlySelected,
+                  label: Text('Only selected')),
+              ButtonSegment(
+                  value: NavLabelBehavior.always, label: Text('Always show')),
             ],
             selected: {settings.navBehavior},
             onSelectionChanged: (sel) {
@@ -181,7 +197,10 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             'Popups & tips',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         SwitchListTile.adaptive(
@@ -197,21 +216,29 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             'Data',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         ListTile(
           leading: const Icon(Icons.delete_sweep_outlined),
-          title: const Text('Clear all saved sets'),
+          title: const Text('Clear all saved tests'),
           onTap: () async {
             final ok = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Clear all saved sets?'),
-                content: const Text('This will delete all saved sets for the current user.'),
+                title: const Text('Clear all saved tests?'),
+                content: const Text(
+                    'This will delete all saved tests for the current user.'),
                 actions: [
-                  TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                  FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Clear all')),
+                  TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Clear all')),
                 ],
               ),
             );
@@ -220,7 +247,8 @@ class SettingsScreen extends ConsumerWidget {
               final userId = ref.read(effectiveUserIdProvider);
               await repo.clearScoreSets(userId: userId);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All sets cleared')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('All sets cleared')));
               }
             }
           },
@@ -232,7 +260,10 @@ class SettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             'About',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         FutureBuilder<PackageInfo>(
@@ -269,12 +300,12 @@ class SettingsScreen extends ConsumerWidget {
   }
 
 // Local helper: compute age in years from DOB at today.
-int _ageFromDob(DateTime dob) {
-  final now = DateTime.now();
-  int age = now.year - dob.year;
-  final hasHadBirthdayThisYear = (now.month > dob.month) ||
-      (now.month == dob.month && now.day >= dob.day);
-  if (!hasHadBirthdayThisYear) age--;
-  return age.clamp(0, 150);
-}
+  int _ageFromDob(DateTime dob) {
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    final hasHadBirthdayThisYear = (now.month > dob.month) ||
+        (now.month == dob.month && now.day >= dob.day);
+    if (!hasHadBirthdayThisYear) age--;
+    return age.clamp(0, 150);
+  }
 }
