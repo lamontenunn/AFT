@@ -7,6 +7,7 @@ import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
+import 'package:aft_firebase_app/features/saves/saved_test_dialog.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
 
 /// Body-only screen for Saved Sets (no nested Scaffold/AppBar).
@@ -21,11 +22,12 @@ class SavedSetsScreen extends ConsumerWidget {
 
     // If signed out and not using guest, show simple body message (no nested Scaffold).
     if (!auth.isSignedIn && effectiveId != 'guest') {
-      return const Center(child: Text('Sign in to view saved sets'));
+      return const Center(child: Text('Sign in to view saved tests'));
     }
 
     return FutureBuilder<List<ScoreSet>>(
-      future: ref.read(aftRepositoryProvider).listScoreSets(userId: effectiveId),
+      future:
+          ref.read(aftRepositoryProvider).listScoreSets(userId: effectiveId),
       builder: (context, snapshot) {
         // Header row with actions shown regardless of state (kept lightweight).
         Widget header = Padding(
@@ -33,8 +35,11 @@ class SavedSetsScreen extends ConsumerWidget {
           child: Row(
             children: [
               Text(
-                'Saved sets',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                'Saved tests',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               if (auth.isSignedIn && effectiveId != 'guest')
@@ -46,7 +51,8 @@ class SavedSetsScreen extends ConsumerWidget {
                     await GuestMigration.maybeMigrateGuestTo(uid);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Guest data merged (if any)')),
+                        const SnackBar(
+                            content: Text('Guest data merged (if any)')),
                       );
                       Navigator.pushReplacementNamed(context, Routes.savedSets);
                     }
@@ -59,11 +65,16 @@ class SavedSetsScreen extends ConsumerWidget {
                   final ok = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Clear all saved sets?'),
-                      content: const Text('This will delete all saved sets for the current user.'),
+                      title: const Text('Clear all saved tests?'),
+                      content: const Text(
+                          'This will delete all saved tests for the current user.'),
                       actions: [
-                        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                        FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Clear all')),
+                        TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel')),
+                        FilledButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Clear all')),
                       ],
                     ),
                   );
@@ -72,7 +83,8 @@ class SavedSetsScreen extends ConsumerWidget {
                     final userId = ref.read(effectiveUserIdProvider);
                     await repo.clearScoreSets(userId: userId);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All sets cleared')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('All sets cleared')));
                       Navigator.pushReplacementNamed(context, Routes.savedSets);
                     }
                   }
@@ -99,7 +111,8 @@ class SavedSetsScreen extends ConsumerWidget {
               header,
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Center(child: Text('Failed to load sets: ${snapshot.error}')),
+                child: Center(
+                    child: Text('Failed to load sets: ${snapshot.error}')),
               ),
             ],
           );
@@ -111,7 +124,7 @@ class SavedSetsScreen extends ConsumerWidget {
               SizedBox(height: 12),
               Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Center(child: Text('No saved sets yet')),
+                child: Center(child: Text('No saved tests yet')),
               ),
             ],
           );
@@ -121,15 +134,26 @@ class SavedSetsScreen extends ConsumerWidget {
         return ListView.separated(
           padding: const EdgeInsets.only(bottom: 12),
           itemCount: sets.length + 1,
-          separatorBuilder: (context, index) => index == 0 ? const SizedBox.shrink() : const Divider(height: 1),
+          separatorBuilder: (context, index) =>
+              index == 0 ? const SizedBox.shrink() : const Divider(height: 1),
           itemBuilder: (context, index) {
             if (index == 0) return header;
 
             final set = sets[index - 1];
             final total = set.computed?.total;
+            final comp = set.computed;
+            final bool isFail = [
+              comp?.mdlScore,
+              comp?.pushUpsScore,
+              comp?.sdcScore,
+              comp?.plankScore,
+              comp?.run2miScore,
+            ].any((s) => s != null && s < 60);
             final date = set.createdAt;
             final savedAtLabel = formatYmdHm(date);
-            final testDateLabel = set.profile.testDate == null ? '—' : formatYmd(set.profile.testDate!);
+            final testDateLabel = set.profile.testDate == null
+                ? '—'
+                : formatYmd(set.profile.testDate!);
 
             return Dismissible(
               key: ValueKey(set.id),
@@ -144,11 +168,15 @@ class SavedSetsScreen extends ConsumerWidget {
                 final ok = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Delete this saved set?'),
+                    title: const Text('Delete this saved test?'),
                     content: const Text('This cannot be undone.'),
                     actions: [
-                      TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Delete')),
+                      TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('Delete')),
                     ],
                   ),
                 );
@@ -157,7 +185,8 @@ class SavedSetsScreen extends ConsumerWidget {
                   final userId = ref.read(effectiveUserIdProvider);
                   await repo.deleteScoreSet(userId: userId, id: set.id);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deleted')));
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(const SnackBar(content: Text('Deleted')));
                     Navigator.pushReplacementNamed(context, Routes.savedSets);
                   }
                   return true;
@@ -166,7 +195,10 @@ class SavedSetsScreen extends ConsumerWidget {
               },
               child: ListTile(
                 leading: const Icon(Icons.fitness_center_outlined),
-                title: Text('Total: ${total ?? '—'}'),
+                title: Text(
+                  'Total: ${total ?? '—'}',
+                  style: TextStyle(color: isFail ? Colors.red : null),
+                ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -174,6 +206,62 @@ class SavedSetsScreen extends ConsumerWidget {
                     Text('Saved $savedAtLabel'),
                   ],
                 ),
+                onTap: () async {
+                  await showSavedTestDialog(
+                    context,
+                    set: set,
+                    onEdit: () async {
+                      // Load into calculator for editing
+                      final p = set.profile;
+                      final i = set.inputs;
+                      final prof = ref.read(aftProfileProvider.notifier);
+                      prof.setAge(p.age);
+                      prof.setSex(p.sex);
+                      prof.setStandard(p.standard);
+                      prof.setTestDate(p.testDate);
+                      final inp = ref.read(aftInputsProvider.notifier);
+                      inp.setMdlLbs(i.mdlLbs);
+                      inp.setPushUps(i.pushUps);
+                      inp.setSdc(i.sdc);
+                      inp.setPlank(i.plank);
+                      inp.setRun2mi(i.run2mi);
+
+                      ref.read(editingSetProvider.notifier).state =
+                          ScoreEditing(id: set.id, createdAt: set.createdAt);
+                      if (context.mounted) {
+                        Navigator.pushReplacementNamed(context, Routes.home);
+                      }
+                    },
+                    onDelete: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Delete this saved test?'),
+                          content: const Text('This cannot be undone.'),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('Cancel')),
+                            FilledButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('Delete')),
+                          ],
+                        ),
+                      );
+                      if (ok == true) {
+                        final repo = ref.read(aftRepositoryProvider);
+                        final userId = ref.read(effectiveUserIdProvider);
+                        await repo.deleteScoreSet(userId: userId, id: set.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Deleted')));
+                          Navigator.pushReplacementNamed(
+                              context, Routes.savedSets);
+                        }
+                      }
+                    },
+                  );
+                },
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
                     if (value == 'edit') {
@@ -202,11 +290,15 @@ class SavedSetsScreen extends ConsumerWidget {
                       final ok = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Delete this saved set?'),
+                          title: const Text('Delete this saved test?'),
                           content: const Text('This cannot be undone.'),
                           actions: [
-                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Delete')),
+                            TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('Cancel')),
+                            FilledButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('Delete')),
                           ],
                         ),
                       );
@@ -215,8 +307,10 @@ class SavedSetsScreen extends ConsumerWidget {
                         final userId = ref.read(effectiveUserIdProvider);
                         await repo.deleteScoreSet(userId: userId, id: set.id);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deleted')));
-                          Navigator.pushReplacementNamed(context, Routes.savedSets);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Deleted')));
+                          Navigator.pushReplacementNamed(
+                              context, Routes.savedSets);
                         }
                       }
                     }

@@ -38,10 +38,9 @@ class AftScaffold extends ConsumerWidget {
     };
 
     final settings = ref.watch(settingsProvider);
-    final navLabelBehavior =
-        settings.navBehavior == NavLabelBehavior.always
-            ? NavigationDestinationLabelBehavior.alwaysShow
-            : NavigationDestinationLabelBehavior.onlyShowSelected;
+    final navLabelBehavior = settings.navBehavior == NavLabelBehavior.always
+        ? NavigationDestinationLabelBehavior.alwaysShow
+        : NavigationDestinationLabelBehavior.onlyShowSelected;
 
     return Scaffold(
       bottomNavigationBar: NavigationBarTheme(
@@ -52,7 +51,9 @@ class AftScaffold extends ConsumerWidget {
           iconTheme: MaterialStateProperty.resolveWith((states) {
             return IconThemeData(
               size: 18,
-              color: states.contains(MaterialState.selected) ? Colors.black : Colors.black87,
+              color: states.contains(MaterialState.selected)
+                  ? Colors.black
+                  : Colors.black87,
             );
           }),
         ),
@@ -85,7 +86,7 @@ class AftScaffold extends ConsumerWidget {
             NavigationDestination(
               icon: Icon(Icons.folder_outlined),
               selectedIcon: Icon(Icons.folder),
-              label: 'Saved Sets',
+              label: 'Saved Tests',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),
@@ -189,7 +190,6 @@ class _DomainSegmentedControl extends ConsumerWidget {
   }
 }
 
-
 class _ProfileButton extends ConsumerWidget {
   const _ProfileButton();
 
@@ -213,22 +213,25 @@ class _ProfileButton extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 2),
       child: IconButton(
-      tooltip: auth.isSignedIn ? 'Account' : 'Sign in to save scores',
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-      alignment: Alignment.center,
-      splashRadius: 20,
-      icon: (auth.displayName != null && auth.displayName!.trim().isNotEmpty)
-          ? CircleAvatar(
-              radius: 12,
-              child: Text(
-                _initialsFor(auth),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-            )
-          : const Icon(Icons.person_outline),
-      onPressed: () => _showProfileSheet(context, ref, auth),
-    ),
+        tooltip: auth.isSignedIn ? 'Account' : 'Sign in to save scores',
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+        alignment: Alignment.center,
+        splashRadius: 20,
+        icon: (auth.displayName != null && auth.displayName!.trim().isNotEmpty)
+            ? CircleAvatar(
+                radius: 12,
+                child: Text(
+                  _initialsFor(auth),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              )
+            : const Icon(Icons.person_outline),
+        onPressed: () => _showProfileSheet(context, ref, auth),
+      ),
     );
   }
 
@@ -282,8 +285,12 @@ class _ProfileButton extends ConsumerWidget {
                               : 'You can sign back in at any time.',
                         ),
                         actions: [
-                          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Sign out')),
+                          TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel')),
+                          FilledButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Sign out')),
                         ],
                       ),
                     );
