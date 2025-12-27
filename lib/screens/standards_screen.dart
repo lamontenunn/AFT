@@ -27,7 +27,8 @@ class _StandardsScreenState extends ConsumerState<StandardsScreen> {
     final initial = ref.read(standardsScrollOffsetProvider);
     _controller = ScrollController(initialScrollOffset: initial);
     _controller.addListener(() {
-      ref.read(standardsScrollOffsetProvider.notifier).state = _controller.offset;
+      ref.read(standardsScrollOffsetProvider.notifier).state =
+          _controller.offset;
     });
   }
 
@@ -47,8 +48,9 @@ class _StandardsScreenState extends ConsumerState<StandardsScreen> {
         SliverPersistentHeader(
           pinned: true,
           delegate: _PinnedControlsDelegate(
-            minExtent: 120,
-            maxExtent: 120,
+            // Fixed height (no FittedBox) so tap targets stay large.
+            minExtent: 112,
+            maxExtent: 112,
             builder: (ctx) => const _TopControls(),
           ),
         ),
@@ -70,18 +72,7 @@ class _StandardsScreenState extends ConsumerState<StandardsScreen> {
 
 const double kCtrlHeight = 36.0;
 
-ButtonStyle _segmentedStyle(BuildContext context) {
-  final outline = Theme.of(context).colorScheme.outline;
-  return ButtonStyle(
-    visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-    side: WidgetStateProperty.resolveWith((states) {
-      if (states.contains(WidgetState.focused) || states.contains(WidgetState.selected)) {
-        return const BorderSide(color: ArmyColors.gold, width: 1.4);
-        }
-      return BorderSide(color: outline, width: 1);
-    }),
-  );
-}
+const double _infoBtnSize = 36;
 
 class _TopControls extends ConsumerWidget {
   const _TopControls();
@@ -93,141 +84,212 @@ class _TopControls extends ConsumerWidget {
     final ctrl = ref.read(standardsSelectionProvider.notifier);
     final theme = Theme.of(context);
     final disabledGender = sel.combat; // Combat forces male thresholds
+    final outline = theme.colorScheme.outline;
+    final onSurface = theme.colorScheme.onSurface;
+
+    Future<void> pickAgeBand() async {
+      final selected = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        useSafeArea: true,
+        backgroundColor: theme.colorScheme.surface,
+        builder: (ctx) {
+          return SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                const SizedBox(height: 4),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Age Band',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                ...bands.map(
+                  (b) => ListTile(
+                    title: Text(b),
+                    trailing: b == sel.ageBand ? const Icon(Icons.check) : null,
+                    onTap: () => Navigator.of(ctx).pop(b),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
+      );
+      if (selected != null) {
+        ctrl.setAgeBand(selected);
+      }
+    }
+
+    Widget filterChip({
+      required String label,
+      required bool selected,
+      required VoidCallback? onTap,
+      bool emphasize = false,
+    }) {
+      // Match Home screen chip selection style:
+      // - selected bg: gold tint
+      // - selected border: gold
+      // - selected text: black
+      final bool enabled = onTap != null;
+      final bool isGlow = emphasize;
+
+      final Color bg = selected
+          ? (isGlow ? ArmyColors.gold : ArmyColors.gold.withOpacity(0.18))
+          : theme.colorScheme.surface;
+      final Color borderColor =
+          selected ? (isGlow ? ArmyColors.gold : ArmyColors.gold) : outline;
+      final Color textColor =
+          selected ? (isGlow ? Colors.black : ArmyColors.black) : onSurface;
+
+      return InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: borderColor,
+              width: selected ? 1.2 : 1.0,
+            ),
+            boxShadow: selected && emphasize
+                ? [
+                    BoxShadow(
+                      color: ArmyColors.gold.withOpacity(0.55),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Opacity(
+              opacity: enabled ? 1.0 : 0.45,
+              child: Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Material(
       color: theme.colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.colorScheme.outline.withOpacity(0.6), width: 1),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: outline.withOpacity(0.5), width: 1),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SizedBox(
-                width: constraints.maxWidth,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Gender (Male/Female)
-                      SizedBox(
-                        height: kCtrlHeight,
-                        child: Opacity(
-                          opacity: disabledGender ? 0.5 : 1.0,
-                          child: SegmentedButton<AftSex>(
-                            style: _segmentedStyle(context),
-                            segments: const [
-                              ButtonSegment(value: AftSex.male, label: Text('Male')),
-                              ButtonSegment(value: AftSex.female, label: Text('Female')),
-                            ],
-                            selected: {sel.sex},
-                            onSelectionChanged: disabledGender
-                                ? null
-                                : (s) {
-                                    if (s.isNotEmpty) ctrl.setSex(s.first);
-                                  },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Combat (single toggle button)
-                      SizedBox(
-                        height: kCtrlHeight,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(999),
-                          onTap: () async {
-                            final next = !sel.combat;
-                            if (next) {
-                              await maybeShowCombatInfoDialog(context, ref);
-                            }
-                            ctrl.setCombat(next);
-                          },
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: sel.combat ? ArmyColors.gold : theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: sel.combat ? ArmyColors.gold : theme.colorScheme.outline,
-                                width: sel.combat ? 1.4 : 1.0,
-                              ),
-                              boxShadow: sel.combat
-                                  ? [
-                                      BoxShadow(
-                                        color: ArmyColors.gold.withOpacity(0.55),
-                                        blurRadius: 12,
-                                        spreadRadius: 1,
-                                      ),
-                                    ]
-                                  : const [],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              child: Align(
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Combat',
-                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: sel.combat ? Colors.black : theme.colorScheme.onSurface,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Age band picker (pill)
-                      SizedBox(
-                        height: kCtrlHeight,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            border: Border.all(color: theme.colorScheme.outline, width: 1),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: sel.ageBand,
-                                isDense: true,
-                                icon: const Icon(Icons.arrow_drop_down, size: 18),
-                                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-                                items: bands
-                                    .map((b) => DropdownMenuItem<String>(
-                                          value: b,
-                                          child: Text(b),
-                                        ))
-                                    .toList(),
-                                onChanged: (b) {
-                                  if (b != null) ctrl.setAgeBand(b);
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1: Sex + Standard
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                filterChip(
+                  label: 'M',
+                  selected: sel.sex == AftSex.male,
+                  onTap: disabledGender ? null : () => ctrl.setSex(AftSex.male),
                 ),
-              );
-            },
-          ),
+                const SizedBox(width: 8),
+                filterChip(
+                  label: 'F',
+                  selected: sel.sex == AftSex.female,
+                  onTap:
+                      disabledGender ? null : () => ctrl.setSex(AftSex.female),
+                ),
+                const SizedBox(width: 12),
+                filterChip(
+                  label: 'General',
+                  selected: !sel.combat,
+                  onTap: () => ctrl.setCombat(false),
+                ),
+                const SizedBox(width: 8),
+                filterChip(
+                  label: 'Combat',
+                  selected: sel.combat,
+                  emphasize: true,
+                  onTap: () async {
+                    final next = !sel.combat;
+                    ctrl.setCombat(next);
+                  },
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  tooltip: 'Combat info',
+                  icon: const Icon(Icons.info_outline, size: 18),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                      width: _infoBtnSize, height: _infoBtnSize),
+                  onPressed: () => maybeShowCombatInfoDialog(context, ref),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+
+            // Row 2: Age band
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: pickAgeBand,
+              child: Container(
+                height: kCtrlHeight,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border.all(color: outline, width: 1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Age Band',
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    Text(
+                      sel.ageBand,
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 }
 
-const List<double> _colW = <double>[56, 64, 64, 72, 72, 72]; // PTS, MDL, HRP, SDC, PLK, 2MR
+const List<double> _colW = <double>[
+  56,
+  64,
+  64,
+  72,
+  72,
+  72
+]; // PTS, MDL, HRP, SDC, PLK, 2MR
 
 // Separator metrics (thin black bars between header columns)
 const double _sepPad = 4.0; // tightened from 6 to reduce total width
@@ -258,13 +320,15 @@ class _HeaderRow extends StatelessWidget {
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: Colors.black26, width: 0.8)),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final widths = _scaledWidths(constraints.maxWidth, includeSeps: true);
+            final widths =
+                _scaledWidths(constraints.maxWidth, includeSeps: true);
             return Row(
               children: [
-                _HeaderCell(width: widths[0], text: 'PTS', align: TextAlign.center),
+                _HeaderCell(
+                    width: widths[0], text: 'PTS', align: TextAlign.center),
                 const _Sep(),
                 _HeaderCell(width: widths[1], text: 'MDL'),
                 const _Sep(),
@@ -295,10 +359,11 @@ class _StandardsRows extends ConsumerWidget {
     final theme = Theme.of(context);
     final alt = theme.colorScheme.onSurface.withOpacity(0.7);
     final timeStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontFeatures: const [FontFeature.tabularFigures()],
-          color: alt,
-        );
-    final numStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: alt);
+      fontFeatures: const [FontFeature.tabularFigures()],
+      color: alt,
+    );
+    final numStyle =
+        Theme.of(context).textTheme.bodyMedium?.copyWith(color: alt);
 
     return ListView.builder(
       shrinkWrap: true,
@@ -309,7 +374,8 @@ class _StandardsRows extends ConsumerWidget {
         final isEven = i.isEven;
         final bool isPassing = r.pts == 60;
         final Color rowColor = isPassing
-            ? Color.alphaBlend(Colors.green.withOpacity(0.18), theme.colorScheme.surface)
+            ? Color.alphaBlend(
+                Colors.green.withOpacity(0.18), theme.colorScheme.surface)
             : (isEven
                 ? theme.colorScheme.surface
                 : Color.alphaBlend(
@@ -321,15 +387,46 @@ class _StandardsRows extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final widths = _scaledWidths(constraints.maxWidth, includeSeps: false);
+              final widths =
+                  _scaledWidths(constraints.maxWidth, includeSeps: false);
               return Row(
                 children: [
-                  _DataCell(width: widths[0], text: r.pts.toString(), align: TextAlign.center, bold: true, height: _rowHeight),
-                  _DataCell(width: widths[1], text: r.mdl, align: TextAlign.right, style: numStyle, height: _rowHeight),
-                  _DataCell(width: widths[2], text: r.hrp, align: TextAlign.right, style: numStyle, height: _rowHeight),
-                  _DataCell(width: widths[3], text: r.sdc, align: TextAlign.right, style: timeStyle, height: _rowHeight),
-                  _DataCell(width: widths[4], text: r.plk, align: TextAlign.right, style: timeStyle, height: _rowHeight),
-                  _DataCell(width: widths[5], text: r.run2mi, align: TextAlign.right, style: timeStyle, height: _rowHeight),
+                  _DataCell(
+                      width: widths[0],
+                      text: r.pts.toString(),
+                      align: TextAlign.center,
+                      bold: true,
+                      height: _rowHeight),
+                  _DataCell(
+                      width: widths[1],
+                      text: r.mdl,
+                      align: TextAlign.right,
+                      style: numStyle,
+                      height: _rowHeight),
+                  _DataCell(
+                      width: widths[2],
+                      text: r.hrp,
+                      align: TextAlign.right,
+                      style: numStyle,
+                      height: _rowHeight),
+                  _DataCell(
+                      width: widths[3],
+                      text: r.sdc,
+                      align: TextAlign.right,
+                      style: timeStyle,
+                      height: _rowHeight),
+                  _DataCell(
+                      width: widths[4],
+                      text: r.plk,
+                      align: TextAlign.right,
+                      style: timeStyle,
+                      height: _rowHeight),
+                  _DataCell(
+                      width: widths[5],
+                      text: r.run2mi,
+                      align: TextAlign.right,
+                      style: timeStyle,
+                      height: _rowHeight),
                 ],
               );
             },
@@ -357,7 +454,9 @@ class _HeaderCell extends StatelessWidget {
       width: width,
       height: 28,
       child: Align(
-        alignment: align == TextAlign.center ? Alignment.center : Alignment.centerRight,
+        alignment: align == TextAlign.center
+            ? Alignment.center
+            : Alignment.centerRight,
         child: Text(
           text,
           textAlign: align,
@@ -396,14 +495,17 @@ class _DataCell extends StatelessWidget {
     if (text == null) {
       return SizedBox(width: width, height: height);
     }
-    final effStyle = (style ?? Theme.of(context).textTheme.bodyMedium)?.copyWith(
+    final effStyle =
+        (style ?? Theme.of(context).textTheme.bodyMedium)?.copyWith(
       fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
     );
     return SizedBox(
       width: width,
       height: height,
       child: Align(
-        alignment: align == TextAlign.center ? Alignment.center : Alignment.centerRight,
+        alignment: align == TextAlign.center
+            ? Alignment.center
+            : Alignment.centerRight,
         child: Text(
           text!,
           textAlign: align,
@@ -448,7 +550,8 @@ class _PinnedControlsDelegate extends SliverPersistentHeaderDelegate {
   final WidgetBuilder builder;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     // Ensure the header child expands to the sliver's current size to avoid
     // "layoutExtent exceeds paintExtent" assertions in pinned headers.
     return SizedBox.expand(child: builder(context));
