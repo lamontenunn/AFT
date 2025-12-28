@@ -18,8 +18,8 @@ class _TickBar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (thresholds == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final width = 260.0; // compact non-interactive bar width
-    final height = 12.0;
+    final width = 220.0; // compact non-interactive bar width
+    final height = 8.0;
 
     double pos(int v) => ((v - min) / (max - min)).clamp(0, 1);
 
@@ -58,8 +58,7 @@ class _TickPainter extends CustomPainter {
       ..color = Colors.black.withOpacity(0.12)
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
-    final dot = Paint()
-      ..color = Colors.black.withOpacity(0.45);
+    final dot = Paint()..color = Colors.black.withOpacity(0.45);
 
     final y = size.height / 2;
     canvas.drawLine(Offset(0, y), Offset(size.width, y), track);
@@ -83,6 +82,7 @@ class AftIntSlider extends StatefulWidget {
     required this.onChanged,
     this.suffix,
     this.thresholds,
+    this.showTicks = true,
   });
 
   final String label;
@@ -91,6 +91,7 @@ class AftIntSlider extends StatefulWidget {
   final ValueChanged<int> onChanged;
   final String? suffix;
   final ScoreThresholds? thresholds;
+  final bool showTicks;
 
   @override
   State<AftIntSlider> createState() => _AftIntSliderState();
@@ -132,52 +133,72 @@ class _AftIntSliderState extends State<AftIntSlider> {
             Text(widget.label, style: theme.textTheme.bodyMedium),
             Semantics(
               label: widget.label,
-              value: widget.suffix == null ? '${widget.value}' : '${widget.value} ${widget.suffix}',
+              value: widget.suffix == null
+                  ? '${widget.value}'
+                  : '${widget.value} ${widget.suffix}',
               child: Text(
-                widget.suffix == null ? '${widget.value}' : '${widget.value} ${widget.suffix}',
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                widget.suffix == null
+                    ? '${widget.value}'
+                    : '${widget.value} ${widget.suffix}',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
           ],
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            showValueIndicator: ShowValueIndicator.always,
+            showValueIndicator: ShowValueIndicator.onlyForDiscrete,
+            trackHeight: 2.5,
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
           ),
           child: Slider(
             value: widget.value.clamp(min.toInt(), max.toInt()).toDouble(),
             min: min,
             max: max,
             divisions: divisions,
-            label: widget.suffix == null ? '${widget.value}' : '${widget.value} ${widget.suffix}',
+            label: widget.suffix == null
+                ? '${widget.value}'
+                : '${widget.value} ${widget.suffix}',
             onChanged: (v) {
               final snapped = _snap(v);
               final b = _bucketFor(snapped);
               if (b != _lastBucket && b != -1) {
-                if (b == 100) HapticFeedback.lightImpact();
-                else HapticFeedback.selectionClick();
+                if (b == 100)
+                  HapticFeedback.lightImpact();
+                else
+                  HapticFeedback.selectionClick();
                 _lastBucket = b;
               }
               widget.onChanged(snapped);
             },
           ),
         ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _TickBar(
-            min: min,
-            max: max,
-            thresholds: widget.thresholds,
+        if (widget.showTicks) ...[
+          const SizedBox(height: 2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _TickBar(
+              min: min,
+              max: max,
+              thresholds: widget.thresholds,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+        ],
+        const SizedBox(height: 2),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(widget.suffix == null ? '${min.toInt()}' : '${min.toInt()} ${widget.suffix}',
+            Text(
+                widget.suffix == null
+                    ? '${min.toInt()}'
+                    : '${min.toInt()} ${widget.suffix}',
                 style: theme.textTheme.labelSmall),
-            Text(widget.suffix == null ? '${max.toInt()}' : '${max.toInt()} ${widget.suffix}',
+            Text(
+                widget.suffix == null
+                    ? '${max.toInt()}'
+                    : '${max.toInt()} ${widget.suffix}',
                 style: theme.textTheme.labelSmall),
           ],
         ),
@@ -195,6 +216,7 @@ class AftTimeSlider extends StatefulWidget {
     required this.onChanged,
     this.reversed = false,
     this.thresholds,
+    this.showTicks = true,
   });
 
   final String label;
@@ -203,6 +225,7 @@ class AftTimeSlider extends StatefulWidget {
   final ValueChanged<int> onChanged;
   final bool reversed;
   final ScoreThresholds? thresholds;
+  final bool showTicks;
 
   @override
   State<AftTimeSlider> createState() => _AftTimeSliderState();
@@ -212,12 +235,14 @@ class _AftTimeSliderState extends State<AftTimeSlider> {
   int _bucketFor(int v) {
     final t = widget.thresholds;
     if (t == null) return -1;
-    if (widget.reversed) { // lower is better
+    if (widget.reversed) {
+      // lower is better
       if (v <= t.p100) return 100;
       if (v <= t.p90) return 90;
       if (v <= t.p60) return 60;
       return 0;
-    } else { // higher is better (plank)
+    } else {
+      // higher is better (plank)
       if (v >= t.p100) return 100;
       if (v >= t.p90) return 90;
       if (v >= t.p60) return 60;
@@ -243,7 +268,8 @@ class _AftTimeSliderState extends State<AftTimeSlider> {
     final int divisions = (max - min).toInt();
 
     final clamped = widget.seconds.clamp(min.toInt(), max.toInt());
-    final double uiValue = widget.reversed ? (min + max - clamped) : clamped.toDouble();
+    final double uiValue =
+        widget.reversed ? (min + max - clamped) : clamped.toDouble();
 
     String format(int s) => formatMmSs(s);
 
@@ -259,14 +285,18 @@ class _AftTimeSliderState extends State<AftTimeSlider> {
               value: format(clamped),
               child: Text(
                 format(clamped),
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
           ],
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            showValueIndicator: ShowValueIndicator.always,
+            showValueIndicator: ShowValueIndicator.onlyForDiscrete,
+            trackHeight: 2.5,
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
           ),
           child: Slider(
             value: uiValue,
@@ -279,25 +309,29 @@ class _AftTimeSliderState extends State<AftTimeSlider> {
               final snapped = _snap(secondsRaw);
               final b = _bucketFor(snapped);
               if (b != _lastBucket && b != -1) {
-                if (b == 100) HapticFeedback.lightImpact();
-                else HapticFeedback.selectionClick();
+                if (b == 100)
+                  HapticFeedback.lightImpact();
+                else
+                  HapticFeedback.selectionClick();
                 _lastBucket = b;
               }
               widget.onChanged(snapped);
             },
           ),
         ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _TickBar(
-            min: widget.reversed ? min : min,
-            max: widget.reversed ? max : max,
-            thresholds: widget.thresholds,
-            formatLabel: (s) => format(s),
+        if (widget.showTicks) ...[
+          const SizedBox(height: 2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _TickBar(
+              min: widget.reversed ? min : min,
+              max: widget.reversed ? max : max,
+              thresholds: widget.thresholds,
+              formatLabel: (s) => format(s),
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+        ],
+        const SizedBox(height: 2),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
