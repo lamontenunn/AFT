@@ -16,6 +16,7 @@ class AftStepper extends StatefulWidget {
     this.displayFormatter,
     this.semanticsLabel,
     this.enableHoldAccelerate = true,
+    this.compact = false,
   });
 
   /// Current value (integer). For time steppers, this can be seconds.
@@ -40,6 +41,9 @@ class AftStepper extends StatefulWidget {
 
   /// Enable press-and-hold acceleration (default true).
   final bool enableHoldAccelerate;
+
+  /// Compact rendering for dense layouts.
+  final bool compact;
 
   @override
   State<AftStepper> createState() => _AftStepperState();
@@ -113,7 +117,8 @@ class _AftStepperState extends State<AftStepper> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    String centerText = widget.displayFormatter?.call(widget.value) ?? '${widget.value}';
+    String centerText =
+        widget.displayFormatter?.call(widget.value) ?? '${widget.value}';
 
     Widget chipButton({
       required IconData icon,
@@ -130,8 +135,12 @@ class _AftStepperState extends State<AftStepper> {
           onLongPressEnd: (_) => _stopRepeat(),
           onLongPressCancel: _stopRepeat,
           child: ConstrainedBox(
-            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-            child: Icon(icon, size: 18, color: cs.onSurface),
+            constraints: BoxConstraints.tightFor(
+              width: widget.compact ? 32 : 40,
+              height: widget.compact ? 32 : 40,
+            ),
+            child:
+                Icon(icon, size: widget.compact ? 15 : 18, color: cs.onSurface),
           ),
         ),
       );
@@ -148,9 +157,9 @@ class _AftStepperState extends State<AftStepper> {
             borderColor: cs.outline,
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: EdgeInsets.symmetric(horizontal: widget.compact ? 4 : 6),
             child: SizedBox(
-              width: 56, // widened to fit "mm:ss"
+              width: widget.compact ? 44 : 56, // widened to fit "mm:ss"
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(

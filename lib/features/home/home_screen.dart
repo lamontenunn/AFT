@@ -8,22 +8,19 @@ import 'package:aft_firebase_app/widgets/aft_event_card.dart';
 import 'package:aft_firebase_app/widgets/aft_score_ring.dart';
 import 'package:aft_firebase_app/widgets/aft_stepper.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
+import 'package:aft_firebase_app/features/aft/state/aft_inputs.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
-import 'package:aft_firebase_app/data/repository_providers.dart';
-import 'package:aft_firebase_app/data/aft_repository.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
 import 'package:aft_firebase_app/features/aft/logic/slider_config.dart'
     as slidercfg;
 import 'package:aft_firebase_app/widgets/aft_event_slider.dart';
 import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
-import 'package:aft_firebase_app/router/app_router.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:aft_firebase_app/widgets/aft_svg_icon.dart';
 import 'package:aft_firebase_app/features/standards/combat_info_dialog.dart';
-import 'package:aft_firebase_app/features/saves/saved_test_dialog.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
@@ -60,6 +57,38 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
 
   // Apply default profile (from Settings) once per visit when not editing
   bool _prefillApplied = false;
+
+  void _syncControllersFromProviders(AftInputs inputs) {
+    bool changed = false;
+
+    String fmtTime(Duration? d) =>
+        d == null ? '' : slidercfg.formatMmSs(d.inSeconds);
+
+    void sync(TextEditingController c, FocusNode f, String desired) {
+      if (f.hasFocus) return;
+      if (c.text != desired) {
+        c.text = desired;
+        changed = true;
+      }
+    }
+
+    sync(_mdlController, _mdlFocus, inputs.mdlLbs?.toString() ?? '');
+    sync(_puController, _puFocus, inputs.pushUps?.toString() ?? '');
+    sync(_sdcController, _sdcFocus, fmtTime(inputs.sdc));
+    sync(_plankController, _plankFocus, fmtTime(inputs.plank));
+    sync(_run2miController, _runFocus, fmtTime(inputs.run2mi));
+
+    if (changed) {
+      // Clear transient validation errors when we are syncing from state (e.g., after Cancel).
+      setState(() {
+        _mdlError = null;
+        _puError = null;
+        _sdcError = null;
+        _plankError = null;
+        _run2miError = null;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -159,6 +188,49 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     }
   }
 
+  Future<void> _pickAge(
+      BuildContext context, WidgetRef ref, int currentAge) async {
+    final theme = Theme.of(context);
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: theme.colorScheme.surface,
+      builder: (ctx) {
+        const minAge = 17;
+        const maxAge = 80;
+        final ages = List<int>.generate(maxAge - minAge + 1, (i) => minAge + i);
+        return SafeArea(
+          child: ListView(
+            children: [
+              const SizedBox(height: 4),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'Select Age',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              ...ages.map(
+                (a) => ListTile(
+                  title: Text('$a'),
+                  trailing: a == currentAge ? const Icon(Icons.check) : null,
+                  onTap: () => Navigator.of(ctx).pop(a),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected != null) {
+      ref.read(aftProfileProvider.notifier).setAge(selected);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -175,7 +247,13 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
       }
     });
     final auth = ref.watch(authStateProvider);
+    // Save/Update actions moved to the top app bar.
+    // (Keep reading auth so UI updates when signed-in/out.)
+    // ignore: unused_local_variable
     final bool canSave = auth.isSignedIn && computed.total != null;
+
+    // Ensure text fields stay in sync with provider state (important when editing is cancelled).
+    _syncControllersFromProviders(inputs);
 
     // Fail rule: if any *known* event score is < 60.
     // (We ignore null scores so missing inputs don't immediately show as failing.)
@@ -255,346 +333,125 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     }
 
     return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: ListView(
-          padding: EdgeInsets.only(
-              bottom: 24 + MediaQuery.of(context).viewInsets.bottom),
-          children: [
-            const SizedBox(height: 12),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
 
-            // Total card
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Semantics(
-                          label: 'Total score',
-                          value: computed.total?.toString() ?? 'No total yet',
-                          child: Text(
-                            computed.total == null
-                                ? 'Total: —'
-                                : 'Total: ${computed.total}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: isFail ? Colors.red : cs.onSurface,
-                            ),
-                          ),
+          // Total summary (sticky)
+          Material(
+            color: theme.colorScheme.surface,
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      label: 'Total score',
+                      value: computed.total?.toString() ?? 'No total yet',
+                      child: Text(
+                        computed.total == null
+                            ? 'Total: —'
+                            : 'Total: ${computed.total}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: isFail ? Colors.red : cs.onSurface,
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: ShapeDecoration(
-                          shape: StadiumBorder(
-                            side:
-                                BorderSide(color: ArmyColors.gold, width: 1.2),
-                          ),
-                        ),
-                        child: Text(
-                          '—', // Placeholder pass/fail
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (editing != null)
-                        TextButton.icon(
-                          onPressed: () async {
-                            final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Cancel update?'),
-                                content: const Text(
-                                    'Discard your changes and exit editing mode?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(false),
-                                    child: const Text('Keep editing'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(true),
-                                    child: const Text('Discard'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (ok == true) {
-                              final repo = ref.read(aftRepositoryProvider);
-                              final userId = ref.read(effectiveUserIdProvider);
-                              final sets =
-                                  await repo.listScoreSets(userId: userId);
-                              ScoreSet? original;
-                              for (final s in sets) {
-                                if (s.id == editing!.id) {
-                                  original = s;
-                                  break;
-                                }
-                              }
-                              if (original != null) {
-                                final p = original!.profile;
-                                final i = original!.inputs;
-                                final prof =
-                                    ref.read(aftProfileProvider.notifier);
-                                prof.setAge(p.age);
-                                prof.setSex(p.sex);
-                                prof.setStandard(p.standard);
-                                prof.setTestDate(p.testDate);
-                                final inp =
-                                    ref.read(aftInputsProvider.notifier);
-                                inp.setMdlLbs(i.mdlLbs);
-                                inp.setPushUps(i.pushUps);
-                                inp.setSdc(i.sdc);
-                                inp.setPlank(i.plank);
-                                inp.setRun2mi(i.run2mi);
-                              }
-                              ref.read(editingSetProvider.notifier).state =
-                                  null;
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('Update canceled')),
-                                );
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.close),
-                          label: const Text('Cancel'),
-                        ),
-                      Tooltip(
-                        message: auth.isSignedIn
-                            ? (editing != null
-                                ? 'Update saved test'
-                                : 'Save results')
-                            : 'Sign in to save results',
-                        preferBelow: false,
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                          ),
-                          onPressed: canSave
-                              ? () async {
-                                  final profileNow =
-                                      ref.read(aftProfileProvider);
-                                  final inputsNow = ref.read(aftInputsProvider);
-                                  final computedNow =
-                                      ref.read(aftComputedProvider);
-                                  final repo = ref.read(aftRepositoryProvider);
-                                  final userId =
-                                      ref.read(effectiveUserIdProvider);
-                                  final createdAt =
-                                      editing?.createdAt ?? DateTime.now();
-                                  final set = ScoreSet(
-                                    id: editing?.id,
-                                    profile: profileNow,
-                                    inputs: inputsNow,
-                                    computed: computedNow,
-                                    createdAt: createdAt,
-                                  );
-                                  if (editing != null) {
-                                    await repo.updateScoreSet(
-                                        userId: userId, set: set);
-                                    // Clear editing state after successful update
-                                    ref
-                                        .read(editingSetProvider.notifier)
-                                        .state = null;
-                                    if (context.mounted) {
-                                      await showSavedTestDialog(
-                                        context,
-                                        set: set,
-                                        onEdit: () {
-                                          // Already on calculator in editing context.
-                                        },
-                                        onDelete: () async {
-                                          final ok = await showDialog<bool>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: const Text(
-                                                  'Delete this saved test?'),
-                                              content: const Text(
-                                                  'This cannot be undone.'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(ctx)
-                                                          .pop(false),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                FilledButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(ctx)
-                                                          .pop(true),
-                                                  child: const Text('Delete'),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (ok == true) {
-                                            await repo.deleteScoreSet(
-                                              userId: userId,
-                                              id: set.id,
-                                            );
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                    content: Text('Deleted')),
-                                              );
-                                            }
-                                          }
-                                        },
-                                      );
-                                    }
-                                  } else {
-                                    await repo.saveScoreSet(
-                                        userId: userId, set: set);
-                                    if (context.mounted) {
-                                      await showSavedTestDialog(
-                                        context,
-                                        set: set,
-                                        onEdit: () {
-                                          // Already on calculator.
-                                        },
-                                        onDelete: () async {
-                                          final ok = await showDialog<bool>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: const Text(
-                                                  'Delete this saved test?'),
-                                              content: const Text(
-                                                  'This cannot be undone.'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(ctx)
-                                                          .pop(false),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                FilledButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(ctx)
-                                                          .pop(true),
-                                                  child: const Text('Delete'),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (ok == true) {
-                                            await repo.deleteScoreSet(
-                                              userId: userId,
-                                              id: set.id,
-                                            );
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                    content: Text('Deleted')),
-                                              );
-                                            }
-                                          }
-                                        },
-                                      );
-                                    }
-                                  }
-                                }
-                              : null,
-                          icon: const Icon(Icons.save_outlined),
-                          label: Text(editing != null ? 'Update' : 'Save'),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  if (computed.total != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: ShapeDecoration(
+                        shape: StadiumBorder(
+                          side: BorderSide(
+                            color: isFail ? Colors.red : ArmyColors.gold,
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        isFail ? 'FAIL' : 'PASS',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
+          ),
 
-            // Context row card
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.only(
+                bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              children: [
+                // Context row
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Semantics(
-                        header: true,
-                        child: Text('Profile & Test',
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700)),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      Row(
                         children: [
-                          // Age dropdown as pill
+                          // Age picker
                           AftPill(
+                            onTap: () => _pickAge(context, ref, profile.age),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Text('Age'),
                                 const SizedBox(width: 8),
-                                DropdownButtonHideUnderline(
-                                  child: DropdownButton<int>(
-                                    value: profile.age,
-                                    dropdownColor: cs.surface,
-                                    items: List.generate(64, (i) => 17 + i)
-                                        .map((a) => DropdownMenuItem(
-                                              value: a,
-                                              child: Text('$a'),
-                                            ))
-                                        .toList(),
-                                    onChanged: (v) {
-                                      if (v != null) {
-                                        ref
-                                            .read(aftProfileProvider.notifier)
-                                            .setAge(v);
-                                      }
-                                    },
-                                  ),
+                                Text(
+                                  '${profile.age}',
+                                  style: theme.textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(Icons.arrow_drop_down, size: 18),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+
+                          // Sex chips
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                AftChoiceChip(
+                                  label: 'Male',
+                                  selected: profile.sex == AftSex.male,
+                                  onSelected: (val) => ref
+                                      .read(aftProfileProvider.notifier)
+                                      .setSex(AftSex.male),
+                                ),
+                                const SizedBox(width: 8),
+                                AftChoiceChip(
+                                  label: 'Female',
+                                  selected: profile.sex == AftSex.female,
+                                  onSelected: (val) => ref
+                                      .read(aftProfileProvider.notifier)
+                                      .setSex(AftSex.female),
                                 ),
                               ],
                             ),
                           ),
-
-                          // Sex chips
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AftChoiceChip(
-                                label: 'Male',
-                                selected: profile.sex == AftSex.male,
-                                onSelected: (val) => ref
-                                    .read(aftProfileProvider.notifier)
-                                    .setSex(AftSex.male),
-                              ),
-                              const SizedBox(width: 8),
-                              AftChoiceChip(
-                                label: 'Female',
-                                selected: profile.sex == AftSex.female,
-                                onSelected: (val) => ref
-                                    .read(aftProfileProvider.notifier)
-                                    .setSex(AftSex.female),
-                              ),
-                            ],
-                          ),
-
-                          // Standard (Combat toggle)
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          // Combat toggle
                           SizedBox(
                             height: 36,
                             child: InkWell(
@@ -643,13 +500,13 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
+                                      horizontal: 12),
                                   child: Center(
                                     child: Text(
                                       'Combat',
                                       style:
                                           theme.textTheme.labelMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.w700,
                                         color: profile.standard ==
                                                 AftStandard.combat
                                             ? Colors.black
@@ -661,8 +518,9 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                               ),
                             ),
                           ),
+                          const Spacer(),
 
-                          // Test date pill (picker + clear)
+                          // Test date
                           AftPill(
                             onTap: () async {
                               final initial =
@@ -685,12 +543,12 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text('Test Date'),
-                                const SizedBox(width: 8),
+                                const Icon(Icons.event, size: 16),
+                                const SizedBox(width: 6),
                                 Text(
                                   profile.testDate == null
-                                      ? '—'
-                                      : formatYmd(profile.testDate!),
+                                      ? 'Test Date —'
+                                      : 'Test Date ${formatYmd(profile.testDate!)}',
                                   style: theme.textTheme.bodyMedium,
                                 ),
                                 if (profile.testDate != null) ...[
@@ -719,400 +577,507 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                     ],
                   ),
                 ),
-              ),
-            ),
 
-            // MDL card
-            AftEventCard(
-              title: '3-Rep Max Deadlift (MDL)',
-              icon: Icons.fitness_center,
-              leading: const AftSvgIcon(
-                'assets/icons/deadlift.svg',
-                size: 24,
-                padding: const EdgeInsets.all(2),
-                colorFilter:
-                    const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
-              ),
-              trailing: AftScoreRing(score: computed.mdlScore),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Weight (lbs)', style: theme.textTheme.bodyMedium),
-                  const SizedBox(height: 6),
-                  Row(
+                // MDL card
+                AftEventCard(
+                  title: '3-Rep Max Deadlift (MDL)',
+                  icon: Icons.fitness_center,
+                  compact: true,
+                  leading: const AftSvgIcon(
+                    'assets/icons/deadlift.svg',
+                    size: 24,
+                    padding: const EdgeInsets.all(2),
+                    colorFilter: const ColorFilter.mode(
+                        ArmyColors.gold, BlendMode.srcIn),
+                  ),
+                  trailing: AftScoreRing(
+                      score: computed.mdlScore, size: 36, stroke: 5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _mdlController,
-                          focusNode: _mdlFocus,
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (_) =>
-                              FocusScope.of(context).requestFocus(_puFocus),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          onChanged: _onMdlChanged,
-                          scrollPadding: const EdgeInsets.only(bottom: 80),
-                          decoration: InputDecoration(
-                            labelText: 'MDL weight',
-                            hintText: 'e.g., 185',
-                            errorText: _mdlError,
-                            suffixText: 'lbs',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      AftStepper(
-                        value: int.tryParse(_mdlController.text) ?? 0,
-                        min: 0,
-                        step: 5,
-                        onChanged: (v) {
-                          _mdlController.text = '$v';
-                          _onMdlChanged(_mdlController.text);
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.mdl);
-                      final curr = ((inputs.mdlLbs ??
-                                  int.tryParse(_mdlController.text) ??
-                                  cfg.min.toInt())
-                              .clamp(cfg.min.toInt(), cfg.max.toInt()))
-                          .toInt();
-                      return AftIntSlider(
-                        label: 'Weight',
-                        value: curr,
-                        suffix: 'lbs',
-                        config: cfg,
-                        thresholds: slidercfg.getScoreThresholds(
-                          profile.standard,
-                          profile,
-                          AftEvent.mdl,
-                        ),
-                        onChanged: (v) {
-                          _mdlController.text = '$v';
-                          _onMdlChanged(_mdlController.text);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Push-ups card
-            AftEventCard(
-              title: 'Hand-Release Push-ups',
-              icon: Icons.accessibility_new,
-              leading: const AftSvgIcon(
-                'assets/icons/pushup.svg',
-                size: 24,
-                padding: const EdgeInsets.all(2),
-                colorFilter:
-                    const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
-              ),
-              trailing: AftScoreRing(score: computed.pushUpsScore),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Repetitions', style: theme.textTheme.bodyMedium),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _puController,
-                          focusNode: _puFocus,
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (_) =>
-                              FocusScope.of(context).requestFocus(_sdcFocus),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          onChanged: _onPuChanged,
-                          scrollPadding: const EdgeInsets.only(bottom: 80),
-                          decoration: InputDecoration(
-                            labelText: 'Push-ups',
-                            hintText: 'e.g., 30',
-                            errorText: _puError,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      AftStepper(
-                        value: int.tryParse(_puController.text) ?? 0,
-                        min: 0,
-                        step: 1,
-                        onChanged: (v) {
-                          _puController.text = '$v';
-                          _onPuChanged(_puController.text);
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.pushUps);
-                      final curr = ((inputs.pushUps ??
-                                  int.tryParse(_puController.text) ??
-                                  cfg.min.toInt())
-                              .clamp(cfg.min.toInt(), cfg.max.toInt()))
-                          .toInt();
-                      return AftIntSlider(
-                        label: 'Repetitions',
-                        value: curr,
-                        config: cfg,
-                        thresholds: slidercfg.getScoreThresholds(
-                          profile.standard,
-                          profile,
-                          AftEvent.pushUps,
-                        ),
-                        onChanged: (v) {
-                          _puController.text = '$v';
-                          _onPuChanged(_puController.text);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Sprint-Drag-Carry card
-            AftEventCard(
-              title: 'Sprint-Drag-Carry',
-              icon: Icons.timer_outlined,
-              leading: const AftSvgIcon(
-                'assets/icons/dragcarry.svg',
-                size: 24,
-                padding: const EdgeInsets.all(2),
-                colorFilter:
-                    const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
-              ),
-              trailing: AftScoreRing(score: computed.sdcScore),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Time (mm:ss)', style: theme.textTheme.bodyMedium),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _sdcController,
-                    focusNode: _sdcFocus,
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) =>
-                        FocusScope.of(context).requestFocus(_plankFocus),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [MmSsFormatter()],
-                    onChanged: _onSdcChanged,
-                    scrollPadding: const EdgeInsets.only(bottom: 80),
-                    decoration: InputDecoration(
-                      labelText: 'Sprint-Drag-Carry time',
-                      hintText: 'e.g., 01:45',
-                      errorText: _sdcError,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.sdc);
-                      final sec = inputs.sdc?.inSeconds ??
-                          parseMmSs(_sdcController.text)?.inSeconds ??
-                          cfg.max.toInt();
-                      final curr =
-                          sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
-                      return AftTimeSlider(
-                        label: 'Sprint-Drag-Carry',
-                        seconds: curr,
-                        config: cfg,
-                        reversed: true,
-                        thresholds: slidercfg.getScoreThresholds(
-                          profile.standard,
-                          profile,
-                          AftEvent.sdc,
-                        ),
-                        onChanged: (v) {
-                          _sdcController.text = slidercfg.formatMmSs(v);
-                          _onSdcChanged(_sdcController.text);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Plank card
-            AftEventCard(
-              title: 'Plank',
-              icon: Icons.access_time,
-              leading: const AftSvgIcon(
-                'assets/icons/plank.svg',
-                size: 24,
-                padding: const EdgeInsets.all(2),
-                colorFilter:
-                    const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
-              ),
-              trailing: AftScoreRing(score: computed.plankScore),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Time (mm:ss)', style: theme.textTheme.bodyMedium),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _plankController,
-                    focusNode: _plankFocus,
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) =>
-                        FocusScope.of(context).requestFocus(_runFocus),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [MmSsFormatter()],
-                    onChanged: _onPlankChanged,
-                    scrollPadding: const EdgeInsets.only(bottom: 80),
-                    decoration: InputDecoration(
-                      labelText: 'Plank time',
-                      hintText: 'e.g., 02:10',
-                      errorText: _plankError,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.plank);
-                      final sec = inputs.plank?.inSeconds ??
-                          parseMmSs(_plankController.text)?.inSeconds ??
-                          cfg.min.toInt();
-                      final curr =
-                          sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
-                      return AftTimeSlider(
-                        label: 'Plank',
-                        seconds: curr,
-                        config: cfg,
-                        thresholds: slidercfg.getScoreThresholds(
-                          profile.standard,
-                          profile,
-                          AftEvent.plank,
-                        ),
-                        onChanged: (v) {
-                          _plankController.text = slidercfg.formatMmSs(v);
-                          _onPlankChanged(_plankController.text);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // 2-Mile Run card
-            AftEventCard(
-              title: '2-Mile Run',
-              icon: Icons.directions_run,
-              leading: const AftSvgIcon(
-                'assets/icons/run.svg',
-                size: 24,
-                padding: const EdgeInsets.all(2),
-                colorFilter:
-                    const ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
-              ),
-              trailing: AftScoreRing(score: computed.run2miScore),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Time (mm:ss)', style: theme.textTheme.bodyMedium),
-                  const SizedBox(height: 6),
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.run2mi);
-                      final sec = inputs.run2mi?.inSeconds ??
-                          parseMmSs(_run2miController.text)?.inSeconds ??
-                          cfg.max.toInt();
-                      final curr =
-                          sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
-                      return Row(
+                      Row(
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: _run2miController,
-                              focusNode: _runFocus,
-                              textInputAction: TextInputAction.done,
+                              controller: _mdlController,
+                              focusNode: _mdlFocus,
+                              textInputAction: TextInputAction.next,
                               onSubmitted: (_) =>
-                                  FocusScope.of(context).unfocus(),
+                                  FocusScope.of(context).requestFocus(_puFocus),
                               keyboardType: TextInputType.number,
-                              inputFormatters: [MmSsFormatter()],
-                              onChanged: _onRunChanged,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              onChanged: _onMdlChanged,
                               scrollPadding: const EdgeInsets.only(bottom: 80),
                               decoration: InputDecoration(
-                                labelText: '2-Mile Run time',
-                                hintText: 'e.g., 16:45',
-                                errorText: _run2miError,
+                                labelText: 'MDL weight',
+                                hintText: 'e.g., 185',
+                                errorText: _mdlError,
+                                suffixText: 'lbs',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           AftStepper(
-                            value: curr,
-                            min: cfg.min.toInt(),
-                            max: cfg.max.toInt(),
-                            step: 1,
-                            displayFormatter: (v) => slidercfg.formatMmSs(v),
-                            semanticsLabel: '2-mile run time',
+                            value: int.tryParse(_mdlController.text) ?? 0,
+                            min: 0,
+                            step: 5,
+                            compact: true,
                             onChanged: (v) {
-                              final clamped = v
-                                  .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                  .toInt();
-                              _run2miController.text =
-                                  slidercfg.formatMmSs(clamped);
-                              _onRunChanged(_run2miController.text);
+                              _mdlController.text = '$v';
+                              _onMdlChanged(_mdlController.text);
                             },
                           ),
                         ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.run2mi);
-                      final sec = inputs.run2mi?.inSeconds ??
-                          parseMmSs(_run2miController.text)?.inSeconds ??
-                          cfg.max.toInt();
-                      final curr =
-                          sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
-                      return AftTimeSlider(
-                        label: '2-Mile Run',
-                        seconds: curr,
-                        config: cfg,
-                        reversed: true,
-                        thresholds: slidercfg.getScoreThresholds(
-                          profile.standard,
-                          profile,
-                          AftEvent.run2mi,
-                        ),
-                        onChanged: (v) {
-                          _run2miController.text = slidercfg.formatMmSs(v);
-                          _onRunChanged(_run2miController.text);
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.mdl);
+                          final curr = ((inputs.mdlLbs ??
+                                      int.tryParse(_mdlController.text) ??
+                                      cfg.min.toInt())
+                                  .clamp(cfg.min.toInt(), cfg.max.toInt()))
+                              .toInt();
+                          return AftIntSlider(
+                            label: 'Weight',
+                            value: curr,
+                            suffix: 'lbs',
+                            config: cfg,
+                            showTicks: false,
+                            thresholds: slidercfg.getScoreThresholds(
+                              profile.standard,
+                              profile,
+                              AftEvent.mdl,
+                            ),
+                            onChanged: (v) {
+                              _mdlController.text = '$v';
+                              _onMdlChanged(_mdlController.text);
+                            },
+                          );
                         },
-                      );
-                    },
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            const SizedBox(height: 12),
-          ],
-        ));
+                // Push-ups card
+                AftEventCard(
+                  title: 'Hand-Release Push-ups',
+                  icon: Icons.accessibility_new,
+                  compact: true,
+                  leading: const AftSvgIcon(
+                    'assets/icons/pushup.svg',
+                    size: 24,
+                    padding: const EdgeInsets.all(2),
+                    colorFilter: const ColorFilter.mode(
+                        ArmyColors.gold, BlendMode.srcIn),
+                  ),
+                  trailing: AftScoreRing(
+                      score: computed.pushUpsScore, size: 36, stroke: 5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _puController,
+                              focusNode: _puFocus,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) => FocusScope.of(context)
+                                  .requestFocus(_sdcFocus),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              onChanged: _onPuChanged,
+                              scrollPadding: const EdgeInsets.only(bottom: 80),
+                              decoration: InputDecoration(
+                                labelText: 'Push-ups',
+                                hintText: 'e.g., 30',
+                                errorText: _puError,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          AftStepper(
+                            value: int.tryParse(_puController.text) ?? 0,
+                            min: 0,
+                            step: 1,
+                            compact: true,
+                            onChanged: (v) {
+                              _puController.text = '$v';
+                              _onPuChanged(_puController.text);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.pushUps);
+                          final curr = ((inputs.pushUps ??
+                                      int.tryParse(_puController.text) ??
+                                      cfg.min.toInt())
+                                  .clamp(cfg.min.toInt(), cfg.max.toInt()))
+                              .toInt();
+                          return AftIntSlider(
+                            label: 'Repetitions',
+                            value: curr,
+                            config: cfg,
+                            showTicks: false,
+                            thresholds: slidercfg.getScoreThresholds(
+                              profile.standard,
+                              profile,
+                              AftEvent.pushUps,
+                            ),
+                            onChanged: (v) {
+                              _puController.text = '$v';
+                              _onPuChanged(_puController.text);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Sprint-Drag-Carry card
+                AftEventCard(
+                  title: 'Sprint-Drag-Carry',
+                  icon: Icons.timer_outlined,
+                  compact: true,
+                  leading: const AftSvgIcon(
+                    'assets/icons/dragcarry.svg',
+                    size: 24,
+                    padding: const EdgeInsets.all(2),
+                    colorFilter: const ColorFilter.mode(
+                        ArmyColors.gold, BlendMode.srcIn),
+                  ),
+                  trailing: AftScoreRing(
+                      score: computed.sdcScore, size: 36, stroke: 5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.sdc);
+                          final sec = inputs.sdc?.inSeconds ??
+                              parseMmSs(_sdcController.text)?.inSeconds ??
+                              cfg.max.toInt();
+                          final curr = sec
+                              .clamp(cfg.min.toInt(), cfg.max.toInt())
+                              .toInt();
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _sdcController,
+                                  focusNode: _sdcFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onSubmitted: (_) => FocusScope.of(context)
+                                      .requestFocus(_plankFocus),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [MmSsFormatter()],
+                                  onChanged: _onSdcChanged,
+                                  scrollPadding:
+                                      const EdgeInsets.only(bottom: 80),
+                                  decoration: InputDecoration(
+                                    labelText: 'Sprint-Drag-Carry time',
+                                    hintText: 'e.g., 01:45',
+                                    errorText: _sdcError,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              AftStepper(
+                                value: curr,
+                                min: cfg.min.toInt(),
+                                max: cfg.max.toInt(),
+                                step: cfg.step.toInt(),
+                                displayFormatter: (v) =>
+                                    slidercfg.formatMmSs(v),
+                                semanticsLabel: 'Sprint-drag-carry time',
+                                compact: true,
+                                onChanged: (v) {
+                                  final clamped = v
+                                      .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                      .toInt();
+                                  _sdcController.text =
+                                      slidercfg.formatMmSs(clamped);
+                                  _onSdcChanged(_sdcController.text);
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.sdc);
+                          final sec = inputs.sdc?.inSeconds ??
+                              parseMmSs(_sdcController.text)?.inSeconds ??
+                              cfg.max.toInt();
+                          final curr = sec
+                              .clamp(cfg.min.toInt(), cfg.max.toInt())
+                              .toInt();
+                          return AftTimeSlider(
+                            label: 'Sprint-Drag-Carry',
+                            seconds: curr,
+                            config: cfg,
+                            reversed: true,
+                            showTicks: false,
+                            thresholds: slidercfg.getScoreThresholds(
+                              profile.standard,
+                              profile,
+                              AftEvent.sdc,
+                            ),
+                            onChanged: (v) {
+                              _sdcController.text = slidercfg.formatMmSs(v);
+                              _onSdcChanged(_sdcController.text);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Plank card
+                AftEventCard(
+                  title: 'Plank',
+                  icon: Icons.access_time,
+                  compact: true,
+                  leading: const AftSvgIcon(
+                    'assets/icons/plank.svg',
+                    size: 24,
+                    padding: const EdgeInsets.all(2),
+                    colorFilter: const ColorFilter.mode(
+                        ArmyColors.gold, BlendMode.srcIn),
+                  ),
+                  trailing: AftScoreRing(
+                      score: computed.plankScore, size: 36, stroke: 5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.plank);
+                          final sec = inputs.plank?.inSeconds ??
+                              parseMmSs(_plankController.text)?.inSeconds ??
+                              cfg.min.toInt();
+                          final curr = sec
+                              .clamp(cfg.min.toInt(), cfg.max.toInt())
+                              .toInt();
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _plankController,
+                                  focusNode: _plankFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onSubmitted: (_) => FocusScope.of(context)
+                                      .requestFocus(_runFocus),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [MmSsFormatter()],
+                                  onChanged: _onPlankChanged,
+                                  scrollPadding:
+                                      const EdgeInsets.only(bottom: 80),
+                                  decoration: InputDecoration(
+                                    labelText: 'Plank time',
+                                    hintText: 'e.g., 02:10',
+                                    errorText: _plankError,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              AftStepper(
+                                value: curr,
+                                min: cfg.min.toInt(),
+                                max: cfg.max.toInt(),
+                                step: cfg.step.toInt(),
+                                displayFormatter: (v) =>
+                                    slidercfg.formatMmSs(v),
+                                semanticsLabel: 'Plank time',
+                                compact: true,
+                                onChanged: (v) {
+                                  final clamped = v
+                                      .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                      .toInt();
+                                  _plankController.text =
+                                      slidercfg.formatMmSs(clamped);
+                                  _onPlankChanged(_plankController.text);
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.plank);
+                          final sec = inputs.plank?.inSeconds ??
+                              parseMmSs(_plankController.text)?.inSeconds ??
+                              cfg.min.toInt();
+                          final curr = sec
+                              .clamp(cfg.min.toInt(), cfg.max.toInt())
+                              .toInt();
+                          return AftTimeSlider(
+                            label: 'Plank',
+                            seconds: curr,
+                            config: cfg,
+                            showTicks: false,
+                            thresholds: slidercfg.getScoreThresholds(
+                              profile.standard,
+                              profile,
+                              AftEvent.plank,
+                            ),
+                            onChanged: (v) {
+                              _plankController.text = slidercfg.formatMmSs(v);
+                              _onPlankChanged(_plankController.text);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 2-Mile Run card
+                AftEventCard(
+                  title: '2-Mile Run',
+                  icon: Icons.directions_run,
+                  compact: true,
+                  leading: const AftSvgIcon(
+                    'assets/icons/run.svg',
+                    size: 24,
+                    padding: const EdgeInsets.all(2),
+                    colorFilter: const ColorFilter.mode(
+                        ArmyColors.gold, BlendMode.srcIn),
+                  ),
+                  trailing: AftScoreRing(
+                      score: computed.run2miScore, size: 36, stroke: 5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.run2mi);
+                          final sec = inputs.run2mi?.inSeconds ??
+                              parseMmSs(_run2miController.text)?.inSeconds ??
+                              cfg.max.toInt();
+                          final curr = sec
+                              .clamp(cfg.min.toInt(), cfg.max.toInt())
+                              .toInt();
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _run2miController,
+                                  focusNode: _runFocus,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) =>
+                                      FocusScope.of(context).unfocus(),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [MmSsFormatter()],
+                                  onChanged: _onRunChanged,
+                                  scrollPadding:
+                                      const EdgeInsets.only(bottom: 80),
+                                  decoration: InputDecoration(
+                                    labelText: '2-Mile Run time',
+                                    hintText: 'e.g., 16:45',
+                                    errorText: _run2miError,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              AftStepper(
+                                value: curr,
+                                min: cfg.min.toInt(),
+                                max: cfg.max.toInt(),
+                                step: 1,
+                                displayFormatter: (v) =>
+                                    slidercfg.formatMmSs(v),
+                                semanticsLabel: '2-mile run time',
+                                compact: true,
+                                onChanged: (v) {
+                                  final clamped = v
+                                      .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                      .toInt();
+                                  _run2miController.text =
+                                      slidercfg.formatMmSs(clamped);
+                                  _onRunChanged(_run2miController.text);
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final cfg = slidercfg.getSliderConfig(
+                              profile.standard, profile, AftEvent.run2mi);
+                          final sec = inputs.run2mi?.inSeconds ??
+                              parseMmSs(_run2miController.text)?.inSeconds ??
+                              cfg.max.toInt();
+                          final curr = sec
+                              .clamp(cfg.min.toInt(), cfg.max.toInt())
+                              .toInt();
+                          return AftTimeSlider(
+                            label: '2-Mile Run',
+                            seconds: curr,
+                            config: cfg,
+                            reversed: true,
+                            showTicks: false,
+                            thresholds: slidercfg.getScoreThresholds(
+                              profile.standard,
+                              profile,
+                              AftEvent.run2mi,
+                            ),
+                            onChanged: (v) {
+                              _run2miController.text = slidercfg.formatMmSs(v);
+                              _onRunChanged(_run2miController.text);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

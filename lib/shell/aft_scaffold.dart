@@ -5,10 +5,12 @@ import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/auth_state.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
+import 'package:aft_firebase_app/data/repository_providers.dart';
+import 'package:aft_firebase_app/data/aft_repository.dart';
+import 'package:aft_firebase_app/features/saves/editing.dart';
+import 'package:aft_firebase_app/features/saves/saved_test_dialog.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
-import 'package:aft_firebase_app/features/auth/providers.dart';
-import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 
 /// App shell with a collapsing AppBar, segmented control, and overflow sheet.
@@ -24,9 +26,6 @@ class AftScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     // Determine current tab index based on the active route (Material 3 NavigationBar)
     final routeName = ModalRoute.of(context)?.settings.name ?? Routes.home;
     final int currentIndex = switch (routeName) {
@@ -37,20 +36,19 @@ class AftScaffold extends ConsumerWidget {
       _ => 0,
     };
 
-    final settings = ref.watch(settingsProvider);
-    final navLabelBehavior = settings.navBehavior == NavLabelBehavior.always
-        ? NavigationDestinationLabelBehavior.alwaysShow
-        : NavigationDestinationLabelBehavior.onlyShowSelected;
+    // Only used to force rebuild when nav behavior changes.
+    // (NavigationBar labelBehavior is currently hard-coded to alwaysHide.)
+    ref.watch(settingsProvider);
 
     return Scaffold(
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           backgroundColor: ArmyColors.gold,
           indicatorColor: Colors.black12,
-          height: 44,
+          height: 30,
           iconTheme: MaterialStateProperty.resolveWith((states) {
             return IconThemeData(
-              size: 18,
+              size: 16,
               color: states.contains(MaterialState.selected)
                   ? Colors.black
                   : Colors.black87,
@@ -107,13 +105,17 @@ class AftScaffold extends ConsumerWidget {
           return [
             SliverAppBar(
               pinned: true,
-              toolbarHeight: 44,
+              toolbarHeight: 30,
               backgroundColor: ArmyColors.gold,
               foregroundColor: Colors.black,
               elevation: 0,
               centerTitle: true,
               title: const SizedBox.shrink(),
               actions: [
+                if (routeName == Routes.home) ...[
+                  _TopBarSaveCancelActions(routeName: routeName),
+                  const SizedBox(width: 4),
+                ],
                 const _ProfileButton(),
                 const SizedBox(width: 8),
               ],
@@ -190,6 +192,199 @@ class _DomainSegmentedControl extends ConsumerWidget {
   }
 }
 
+/// Home-only top bar actions:
+/// - Cancel (when editing an existing saved test)
+/// - Save / Update (auth gated, enabled when total is computed)
+class _TopBarSaveCancelActions extends ConsumerWidget {
+  const _TopBarSaveCancelActions({required this.routeName});
+
+  final String routeName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (routeName != Routes.home) return const SizedBox.shrink();
+
+    final auth = ref.watch(authStateProvider);
+    final computed = ref.watch(aftComputedProvider);
+    final editing = ref.watch(editingSetProvider);
+
+    final bool canSave = auth.isSignedIn && computed.total != null;
+
+    Future<void> doCancel() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cancel update?'),
+          content: const Text('Discard your changes and exit editing mode?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Keep editing'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Discard'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+
+      final repo = ref.read(aftRepositoryProvider);
+      final userId = ref.read(effectiveUserIdProvider);
+      final sets = await repo.listScoreSets(userId: userId);
+      ScoreSet? original;
+      for (final s in sets) {
+        if (s.id == editing!.id) {
+          original = s;
+          break;
+        }
+      }
+      if (original != null) {
+        final p = original.profile;
+        final i = original.inputs;
+        ref.read(aftProfileProvider.notifier)
+          ..setAge(p.age)
+          ..setSex(p.sex)
+          ..setStandard(p.standard)
+          ..setTestDate(p.testDate);
+        ref.read(aftInputsProvider.notifier)
+          ..setMdlLbs(i.mdlLbs)
+          ..setPushUps(i.pushUps)
+          ..setSdc(i.sdc)
+          ..setPlank(i.plank)
+          ..setRun2mi(i.run2mi);
+      }
+      ref.read(editingSetProvider.notifier).state = null;
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Update canceled')),
+        );
+      }
+    }
+
+    Future<void> doSaveOrUpdate() async {
+      final profileNow = ref.read(aftProfileProvider);
+      final inputsNow = ref.read(aftInputsProvider);
+      final computedNow = ref.read(aftComputedProvider);
+      final repo = ref.read(aftRepositoryProvider);
+      final userId = ref.read(effectiveUserIdProvider);
+      final createdAt = editing?.createdAt ?? DateTime.now();
+      final set = ScoreSet(
+        id: editing?.id,
+        profile: profileNow,
+        inputs: inputsNow,
+        computed: computedNow,
+        createdAt: createdAt,
+      );
+
+      if (editing != null) {
+        await repo.updateScoreSet(userId: userId, set: set);
+        // Clear editing state after successful update
+        ref.read(editingSetProvider.notifier).state = null;
+        if (context.mounted) {
+          await showSavedTestDialog(
+            context,
+            set: set,
+            onEdit: () {},
+            onDelete: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete this saved test?'),
+                  content: const Text('This cannot be undone.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok == true) {
+                await repo.deleteScoreSet(userId: userId, id: set.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Deleted')),
+                  );
+                }
+              }
+            },
+          );
+        }
+      } else {
+        await repo.saveScoreSet(userId: userId, set: set);
+        if (context.mounted) {
+          await showSavedTestDialog(
+            context,
+            set: set,
+            onEdit: () {},
+            onDelete: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete this saved test?'),
+                  content: const Text('This cannot be undone.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok == true) {
+                await repo.deleteScoreSet(userId: userId, id: set.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Deleted')),
+                  );
+                }
+              }
+            },
+          );
+        }
+      }
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (editing != null)
+          IconButton(
+            tooltip: 'Cancel update',
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+            splashRadius: 16,
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: doCancel,
+          ),
+        IconButton(
+          tooltip: auth.isSignedIn
+              ? (editing != null ? 'Update saved test' : 'Save results')
+              : 'Sign in to save results',
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+          splashRadius: 16,
+          icon: const Icon(Icons.save_outlined, size: 18),
+          onPressed: canSave ? doSaveOrUpdate : null,
+        ),
+      ],
+    );
+  }
+}
+
 class _ProfileButton extends ConsumerWidget {
   const _ProfileButton();
 
@@ -210,28 +405,26 @@ class _ProfileButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: IconButton(
-        tooltip: auth.isSignedIn ? 'Account' : 'Sign in to save scores',
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-        alignment: Alignment.center,
-        splashRadius: 20,
-        icon: (auth.displayName != null && auth.displayName!.trim().isNotEmpty)
-            ? CircleAvatar(
-                radius: 12,
-                child: Text(
-                  _initialsFor(auth),
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              )
-            : const Icon(Icons.person_outline),
-        onPressed: () => _showProfileSheet(context, ref, auth),
-      ),
+    return IconButton(
+      tooltip: auth.isSignedIn ? 'Account' : 'Sign in to save scores',
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      alignment: Alignment.center,
+      splashRadius: 16,
+      icon: (auth.displayName != null && auth.displayName!.trim().isNotEmpty)
+          ? CircleAvatar(
+              radius: 10,
+              child: Text(
+                _initialsFor(auth),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            )
+          : const Icon(Icons.person_outline, size: 18),
+      onPressed: () => _showProfileSheet(context, ref, auth),
     );
   }
 
