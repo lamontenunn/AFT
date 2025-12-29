@@ -268,10 +268,10 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     // React to Settings changes while on Calculator (apply defaults when not editing)
     ref.listen<SettingsState>(settingsProvider, (prev, next) {
       final editingNow = ref.read(editingSetProvider);
-      if (!next.applyDefaultsOnCalculator || editingNow != null) return;
+      if (editingNow != null) return;
 
       // Compute age from DOB and apply if changed
-      final dob = next.defaultBirthdate;
+      final dob = next.defaultProfile.birthdate;
       if (dob != null) {
         final now = DateTime.now();
         int age = now.year - dob.year;
@@ -288,7 +288,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
         }
       }
       // Apply sex if changed
-      final sex = next.defaultSex;
+      final sex = next.defaultProfile.sex;
       if (sex != null && ref.read(aftProfileProvider).sex != sex) {
         ref.read(aftProfileProvider.notifier).setSex(sex);
       }
@@ -307,10 +307,10 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
           prof.setTestDate(DateTime.now());
         }
 
-        // Apply other defaults only when enabled in Settings and not editing
-        if (settings.applyDefaultsOnCalculator && editing == null) {
+        // Apply defaults when not editing
+        if (editing == null) {
           // Default birthdate -> compute age today
-          final dob = settings.defaultBirthdate;
+          final dob = settings.defaultProfile.birthdate;
           if (dob != null) {
             final now = DateTime.now();
             int age = now.year - dob.year;
@@ -324,7 +324,7 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
             prof.setAge(clampedAge);
           }
           // Default sex
-          final defSex = settings.defaultSex;
+          final defSex = settings.defaultProfile.sex;
           if (defSex != null) {
             prof.setSex(defSex);
           }

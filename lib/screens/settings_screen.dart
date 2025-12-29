@@ -4,16 +4,65 @@ import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
+import 'package:aft_firebase_app/screens/edit_default_profile_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 /// Body-only settings screen. Wrapped by AftScaffold(showHeader: false).
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
+  static String _displayName(DefaultProfileSettings dp) {
+    final first = dp.firstName?.trim();
+    final last = dp.lastName?.trim();
+    final mi = dp.middleInitial?.trim();
+
+    final parts = <String>[];
+    if (last != null && last.isNotEmpty) parts.add(last);
+    if (first != null && first.isNotEmpty) parts.add(first);
+    if (mi != null && mi.isNotEmpty) parts.add('$mi.');
+
+    if (parts.isEmpty) return 'Not set';
+    if (last != null && last.isNotEmpty && first != null && first.isNotEmpty) {
+      // "Last, First M."
+      final firstPart = mi != null && mi.isNotEmpty ? '$first $mi.' : first;
+      return '$last, $firstPart';
+    }
+    // fallback
+    return parts.join(' ');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final ctrl = ref.read(settingsProvider.notifier);
+    final dp = settings.defaultProfile;
+
+    String ymd(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+    String heightLabel() {
+      if (dp.height == null) return 'Not set';
+      if (dp.measurementSystem == MeasurementSystem.metric) {
+        return '${dp.height!.toStringAsFixed(0)} cm';
+      }
+      final totalIn = dp.height!.round();
+      final ft = totalIn ~/ 12;
+      final inch = totalIn % 12;
+      return "$ft' $inch\"";
+    }
+
+    String weightLabel() {
+      if (dp.weight == null) return 'Not set';
+      if (dp.measurementSystem == MeasurementSystem.metric) {
+        return '${dp.weight!.toStringAsFixed(1)} kg';
+      }
+      return '${dp.weight!.toStringAsFixed(1)} lb';
+    }
+
+    String bodyFatLabel() {
+      if (dp.bodyFatPercent == null) return 'Not set';
+      return '${dp.bodyFatPercent!.toStringAsFixed(1)}%';
+    }
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -81,115 +130,96 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         const Divider(height: 1),
 
-        // Default profile
+        // Profile (read-only)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            'Default profile',
+            'Profile',
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
-        ListTile(
-          leading: const Icon(Icons.event_outlined),
-          title: const Text('Birthdate'),
-          subtitle: Text(
-            settings.defaultBirthdate == null
-                ? 'Not set'
-                : '${settings.defaultBirthdate!.year.toString().padLeft(4, '0')}-'
-                    '${settings.defaultBirthdate!.month.toString().padLeft(2, '0')}-'
-                    '${settings.defaultBirthdate!.day.toString().padLeft(2, '0')}'
-                    '  (Age today: ${_ageFromDob(settings.defaultBirthdate!)})',
-          ),
-          trailing: Wrap(
-            spacing: 8,
-            children: [
-              TextButton(
-                onPressed: () async {
-                  final initial = settings.defaultBirthdate ??
-                      DateTime(DateTime.now().year - 25, 1, 1);
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: initial,
-                    firstDate: DateTime(1950, 1, 1),
-                    lastDate: DateTime.now(),
-                    helpText: 'Select birthdate',
-                  );
-                  await ctrl.setDefaultBirthdate(picked);
-                },
-                child: const Text('Set'),
-              ),
-              if (settings.defaultBirthdate != null)
-                TextButton(
-                  onPressed: () => ctrl.setDefaultBirthdate(null),
-                  child: const Text('Clear'),
-                ),
-            ],
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              const Icon(Icons.person_outline),
-              const SizedBox(width: 16),
-              Expanded(
-                child: SegmentedButton<AftSex>(
-                  segments: const [
-                    ButtonSegment(value: AftSex.male, label: Text('Male')),
-                    ButtonSegment(value: AftSex.female, label: Text('Female')),
-                  ],
-                  selected: {settings.defaultSex ?? AftSex.male},
-                  onSelectionChanged: (sel) {
-                    if (sel.isNotEmpty) {
-                      ctrl.setDefaultSex(sel.first);
-                    }
-                  },
-                ),
+          child: Card(
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  _SummaryRow(
+                    label: 'Name',
+                    value: _displayName(dp),
+                  ),
+                  const Divider(height: 12),
+                  _SummaryRow(
+                    label: 'Unit',
+                    value: dp.unit?.trim().isNotEmpty == true
+                        ? dp.unit!.trim()
+                        : 'Not set',
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    label: 'MOS',
+                    value: dp.mos?.trim().isNotEmpty == true
+                        ? dp.mos!.trim()
+                        : 'Not set',
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    label: 'Pay Grade',
+                    value: dp.payGrade?.trim().isNotEmpty == true
+                        ? dp.payGrade!.trim()
+                        : 'Not set',
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    label: 'On profile',
+                    value: dp.onProfile ? 'Yes' : 'No',
+                  ),
+                  const Divider(height: 20),
+                  _SummaryRow(
+                    label: 'Birthdate',
+                    value: dp.birthdate == null
+                        ? 'Not set'
+                        : '${ymd(dp.birthdate!)} (Age ${_ageFromDob(dp.birthdate!)})',
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    label: 'Gender',
+                    value: dp.sex == null
+                        ? 'Not set'
+                        : (dp.sex == AftSex.male ? 'Male' : 'Female'),
+                  ),
+                  const Divider(height: 20),
+                  _SummaryRow(label: 'Height', value: heightLabel()),
+                  const SizedBox(height: 8),
+                  _SummaryRow(label: 'Weight', value: weightLabel()),
+                  const SizedBox(height: 8),
+                  _SummaryRow(label: 'Body fat %', value: bodyFatLabel()),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const EditDefaultProfileScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit profile'),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-        SwitchListTile.adaptive(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          title: const Text('Prefill Calculator with default profile'),
-          value: settings.applyDefaultsOnCalculator,
-          onChanged: (v) => ctrl.setApplyDefaultsOnCalculator(v),
-        ),
-        const Divider(height: 1),
 
-        // Bottom navigation label behavior
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            'Bottom navigation labels',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SegmentedButton<NavLabelBehavior>(
-            segments: const [
-              ButtonSegment(
-                  value: NavLabelBehavior.onlySelected,
-                  label: Text('Only selected')),
-              ButtonSegment(
-                  value: NavLabelBehavior.always, label: Text('Always show')),
-            ],
-            selected: {settings.navBehavior},
-            onSelectionChanged: (sel) {
-              if (sel.isNotEmpty) {
-                ctrl.setNavBehavior(sel.first);
-              }
-            },
-          ),
-        ),
-        const SizedBox(height: 8),
         const Divider(height: 1),
 
         // Popups & tips
@@ -307,5 +337,37 @@ class SettingsScreen extends ConsumerWidget {
         (now.month == dob.month && now.day >= dob.day);
     if (!hasHadBirthdayThisYear) age--;
     return age.clamp(0, 150);
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(
+            label,
+            style: theme.textTheme.labelMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
   }
 }
