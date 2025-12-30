@@ -21,6 +21,8 @@ import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:aft_firebase_app/widgets/aft_svg_icon.dart';
 import 'package:aft_firebase_app/features/standards/combat_info_dialog.dart';
+import 'package:aft_firebase_app/features/aft/utils/rank_assets.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
@@ -332,6 +334,21 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
       });
     }
 
+    final dp = ref.watch(settingsProvider).defaultProfile;
+    final lastName = dp.lastName?.trim();
+    final explicitRankAbbrev = dp.rankAbbrev?.trim();
+    final derivedRankAbbrev = dp.payGrade == null
+        ? null
+        : rankAbbrevByPayGrade[dp.payGrade!.trim().toUpperCase()];
+    final rankAbbrev =
+        (explicitRankAbbrev != null && explicitRankAbbrev.isNotEmpty)
+            ? explicitRankAbbrev.toUpperCase()
+            : derivedRankAbbrev;
+
+    final canShowGreeting = (lastName != null && lastName.isNotEmpty) &&
+        (rankAbbrev != null && rankAbbrev.isNotEmpty) &&
+        rankAssetByAbbrev.containsKey(rankAbbrev);
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => FocusScope.of(context).unfocus(),
@@ -389,695 +406,782 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
             ),
           ),
 
+          // Greeting row (only when we have both last name + rank abbrev).
+          if (canShowGreeting)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: SizedBox(
+                height: 60,
+                child: _RankGreetingRow(
+                  rankAbbrev: rankAbbrev!,
+                  lastName: lastName!,
+                ),
+              ),
+            ),
+
           Expanded(
-            child: ListView(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
               padding: EdgeInsets.only(
                 bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
               ),
-              children: [
-                // Context row
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          // Age picker
-                          AftPill(
-                            onTap: () => _pickAge(context, ref, profile.age),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text('Age'),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${profile.age}',
-                                  style: theme.textTheme.bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w800),
-                                ),
-                                const SizedBox(width: 2),
-                                const Icon(Icons.arrow_drop_down, size: 18),
-                              ],
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  // Context row
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            // Age picker
+                            AftPill(
+                              onTap: () => _pickAge(context, ref, profile.age),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('Age'),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${profile.age}',
+                                    style: theme.textTheme.bodyMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  const Icon(Icons.arrow_drop_down, size: 18),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
+                            const SizedBox(width: 10),
 
-                          // Sex chips
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                AftChoiceChip(
-                                  label: 'Male',
-                                  selected: profile.sex == AftSex.male,
-                                  onSelected: (val) => ref
-                                      .read(aftProfileProvider.notifier)
-                                      .setSex(AftSex.male),
-                                ),
-                                const SizedBox(width: 8),
-                                AftChoiceChip(
-                                  label: 'Female',
-                                  selected: profile.sex == AftSex.female,
-                                  onSelected: (val) => ref
-                                      .read(aftProfileProvider.notifier)
-                                      .setSex(AftSex.female),
-                                ),
-                              ],
+                            // Sex chips
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  AftChoiceChip(
+                                    label: 'Male',
+                                    selected: profile.sex == AftSex.male,
+                                    onSelected: (val) => ref
+                                        .read(aftProfileProvider.notifier)
+                                        .setSex(AftSex.male),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  AftChoiceChip(
+                                    label: 'Female',
+                                    selected: profile.sex == AftSex.female,
+                                    onSelected: (val) => ref
+                                        .read(aftProfileProvider.notifier)
+                                        .setSex(AftSex.female),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          // Combat toggle
-                          SizedBox(
-                            height: 36,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(999),
-                              onTap: () async {
-                                final isCombat =
-                                    profile.standard == AftStandard.combat;
-                                final next = isCombat
-                                    ? AftStandard.general
-                                    : AftStandard.combat;
-                                if (next == AftStandard.combat) {
-                                  await maybeShowCombatInfoDialog(context, ref);
-                                }
-                                ref
-                                    .read(aftProfileProvider.notifier)
-                                    .setStandard(next);
-                                HapticFeedback.selectionClick();
-                              },
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: profile.standard == AftStandard.combat
-                                      ? ArmyColors.gold
-                                      : theme.colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            // Combat toggle
+                            SizedBox(
+                              height: 36,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(999),
+                                onTap: () async {
+                                  final isCombat =
+                                      profile.standard == AftStandard.combat;
+                                  final next = isCombat
+                                      ? AftStandard.general
+                                      : AftStandard.combat;
+                                  if (next == AftStandard.combat) {
+                                    await maybeShowCombatInfoDialog(
+                                        context, ref);
+                                  }
+                                  ref
+                                      .read(aftProfileProvider.notifier)
+                                      .setStandard(next);
+                                  HapticFeedback.selectionClick();
+                                },
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
                                     color:
                                         profile.standard == AftStandard.combat
                                             ? ArmyColors.gold
-                                            : theme.colorScheme.outline,
-                                    width:
+                                            : theme.colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color:
+                                          profile.standard == AftStandard.combat
+                                              ? ArmyColors.gold
+                                              : theme.colorScheme.outline,
+                                      width:
+                                          profile.standard == AftStandard.combat
+                                              ? 1.4
+                                              : 1.0,
+                                    ),
+                                    boxShadow:
                                         profile.standard == AftStandard.combat
-                                            ? 1.4
-                                            : 1.0,
+                                            ? [
+                                                BoxShadow(
+                                                  color: ArmyColors.gold
+                                                      .withOpacity(0.55),
+                                                  blurRadius: 12,
+                                                  spreadRadius: 1,
+                                                ),
+                                              ]
+                                            : const [],
                                   ),
-                                  boxShadow:
-                                      profile.standard == AftStandard.combat
-                                          ? [
-                                              BoxShadow(
-                                                color: ArmyColors.gold
-                                                    .withOpacity(0.55),
-                                                blurRadius: 12,
-                                                spreadRadius: 1,
-                                              ),
-                                            ]
-                                          : const [],
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  child: Center(
-                                    child: Text(
-                                      'Combat',
-                                      style:
-                                          theme.textTheme.labelMedium?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: profile.standard ==
-                                                AftStandard.combat
-                                            ? Colors.black
-                                            : theme.colorScheme.onSurface,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    child: Center(
+                                      child: Text(
+                                        'Combat',
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: profile.standard ==
+                                                  AftStandard.combat
+                                              ? Colors.black
+                                              : theme.colorScheme.onSurface,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          const Spacer(),
+                            const Spacer(),
 
-                          // Test date
-                          AftPill(
-                            onTap: () async {
-                              final initial =
-                                  profile.testDate ?? DateTime.now();
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: initial,
-                                firstDate: DateTime(2018, 1, 1),
-                                lastDate: DateTime.now()
-                                    .add(const Duration(days: 365 * 2)),
-                                helpText: 'Select test date',
-                              );
-                              if (picked != null) {
-                                ref
-                                    .read(aftProfileProvider.notifier)
-                                    .setTestDate(picked);
-                              }
-                            },
-                            tooltip: 'Set test date',
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.event, size: 16),
-                                const SizedBox(width: 6),
-                                Text(
-                                  profile.testDate == null
-                                      ? 'Test Date —'
-                                      : 'Test Date ${formatYmd(profile.testDate!)}',
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                                if (profile.testDate != null) ...[
+                            // Test date
+                            AftPill(
+                              onTap: () async {
+                                final initial =
+                                    profile.testDate ?? DateTime.now();
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: initial,
+                                  firstDate: DateTime(2018, 1, 1),
+                                  lastDate: DateTime.now()
+                                      .add(const Duration(days: 365 * 2)),
+                                  helpText: 'Select test date',
+                                );
+                                if (picked != null) {
+                                  ref
+                                      .read(aftProfileProvider.notifier)
+                                      .setTestDate(picked);
+                                }
+                              },
+                              tooltip: 'Set test date',
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.event, size: 16),
                                   const SizedBox(width: 6),
-                                  Tooltip(
-                                    message: 'Clear date',
-                                    child: InkWell(
-                                      onTap: () {
-                                        ref
-                                            .read(aftProfileProvider.notifier)
-                                            .setTestDate(null);
-                                      },
-                                      borderRadius: BorderRadius.circular(999),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(2),
-                                        child: Icon(Icons.close, size: 16),
+                                  Text(
+                                    profile.testDate == null
+                                        ? 'Test Date —'
+                                        : 'Test Date ${formatYmd(profile.testDate!)}',
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                  if (profile.testDate != null) ...[
+                                    const SizedBox(width: 6),
+                                    Tooltip(
+                                      message: 'Clear date',
+                                      child: InkWell(
+                                        onTap: () {
+                                          ref
+                                              .read(aftProfileProvider.notifier)
+                                              .setTestDate(null);
+                                        },
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(2),
+                                          child: Icon(Icons.close, size: 16),
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // MDL card
-                AftEventCard(
-                  title: '3-Rep Max Deadlift (MDL)',
-                  icon: Icons.fitness_center,
-                  compact: true,
-                  leading: const AftSvgIcon(
-                    'assets/icons/deadlift.svg',
-                    size: 24,
-                    padding: const EdgeInsets.all(2),
-                    colorFilter: const ColorFilter.mode(
-                        ArmyColors.gold, BlendMode.srcIn),
-                  ),
-                  trailing: AftScoreRing(
-                      score: computed.mdlScore, size: 36, stroke: 5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _mdlController,
-                              focusNode: _mdlFocus,
-                              textInputAction: TextInputAction.next,
-                              onSubmitted: (_) =>
-                                  FocusScope.of(context).requestFocus(_puFocus),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly
-                              ],
-                              onChanged: _onMdlChanged,
-                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                              decoration: InputDecoration(
-                                labelText: 'MDL weight',
-                                hintText: 'e.g., 185',
-                                errorText: _mdlError,
-                                suffixText: 'lbs',
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          AftStepper(
-                            value: int.tryParse(_mdlController.text) ?? 0,
-                            min: 0,
-                            step: 5,
-                            compact: true,
-                            onChanged: (v) {
-                              _mdlController.text = '$v';
-                              _onMdlChanged(_mdlController.text);
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.mdl);
-                          final curr = ((inputs.mdlLbs ??
-                                      int.tryParse(_mdlController.text) ??
-                                      cfg.min.toInt())
-                                  .clamp(cfg.min.toInt(), cfg.max.toInt()))
-                              .toInt();
-                          return AftIntSlider(
-                            label: 'Weight',
-                            value: curr,
-                            suffix: 'lbs',
-                            config: cfg,
-                            showTicks: false,
-                            thresholds: slidercfg.getScoreThresholds(
-                              profile.standard,
-                              profile,
-                              AftEvent.mdl,
-                            ),
-                            onChanged: (v) {
-                              _mdlController.text = '$v';
-                              _onMdlChanged(_mdlController.text);
-                            },
-                          );
-                        },
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                // Push-ups card
-                AftEventCard(
-                  title: 'Hand-Release Push-ups',
-                  icon: Icons.accessibility_new,
-                  compact: true,
-                  leading: const AftSvgIcon(
-                    'assets/icons/pushup.svg',
-                    size: 24,
-                    padding: const EdgeInsets.all(2),
-                    colorFilter: const ColorFilter.mode(
-                        ArmyColors.gold, BlendMode.srcIn),
-                  ),
-                  trailing: AftScoreRing(
-                      score: computed.pushUpsScore, size: 36, stroke: 5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _puController,
-                              focusNode: _puFocus,
-                              textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => FocusScope.of(context)
-                                  .requestFocus(_sdcFocus),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly
-                              ],
-                              onChanged: _onPuChanged,
-                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                              decoration: InputDecoration(
-                                labelText: 'Push-ups',
-                                hintText: 'e.g., 30',
-                                errorText: _puError,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          AftStepper(
-                            value: int.tryParse(_puController.text) ?? 0,
-                            min: 0,
-                            step: 1,
-                            compact: true,
-                            onChanged: (v) {
-                              _puController.text = '$v';
-                              _onPuChanged(_puController.text);
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.pushUps);
-                          final curr = ((inputs.pushUps ??
-                                      int.tryParse(_puController.text) ??
-                                      cfg.min.toInt())
-                                  .clamp(cfg.min.toInt(), cfg.max.toInt()))
-                              .toInt();
-                          return AftIntSlider(
-                            label: 'Repetitions',
-                            value: curr,
-                            config: cfg,
-                            showTicks: false,
-                            thresholds: slidercfg.getScoreThresholds(
-                              profile.standard,
-                              profile,
-                              AftEvent.pushUps,
-                            ),
-                            onChanged: (v) {
-                              _puController.text = '$v';
-                              _onPuChanged(_puController.text);
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Sprint-Drag-Carry card
-                AftEventCard(
-                  title: 'Sprint-Drag-Carry',
-                  icon: Icons.timer_outlined,
-                  compact: true,
-                  leading: const AftSvgIcon(
-                    'assets/icons/dragcarry.svg',
-                    size: 24,
-                    padding: const EdgeInsets.all(2),
-                    colorFilter: const ColorFilter.mode(
-                        ArmyColors.gold, BlendMode.srcIn),
-                  ),
-                  trailing: AftScoreRing(
-                      score: computed.sdcScore, size: 36, stroke: 5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.sdc);
-                          final sec = inputs.sdc?.inSeconds ??
-                              parseMmSs(_sdcController.text)?.inSeconds ??
-                              cfg.max.toInt();
-                          final curr = sec
-                              .clamp(cfg.min.toInt(), cfg.max.toInt())
-                              .toInt();
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _sdcController,
-                                  focusNode: _sdcFocus,
-                                  textInputAction: TextInputAction.next,
-                                  onSubmitted: (_) => FocusScope.of(context)
-                                      .requestFocus(_plankFocus),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [MmSsFormatter()],
-                                  onChanged: _onSdcChanged,
-                                  scrollPadding:
-                                      const EdgeInsets.only(bottom: 80),
-                                  decoration: InputDecoration(
-                                    labelText: 'Sprint-Drag-Carry time',
-                                    hintText: 'e.g., 01:45',
-                                    errorText: _sdcError,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                  ),
+                  // MDL card
+                  AftEventCard(
+                    title: '3-Rep Max Deadlift (MDL)',
+                    icon: Icons.fitness_center,
+                    compact: true,
+                    leading: const AftSvgIcon(
+                      'assets/icons/deadlift.svg',
+                      size: 24,
+                      padding: const EdgeInsets.all(2),
+                      colorFilter: const ColorFilter.mode(
+                          ArmyColors.gold, BlendMode.srcIn),
+                    ),
+                    trailing: AftScoreRing(
+                        score: computed.mdlScore, size: 36, stroke: 5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _mdlController,
+                                focusNode: _mdlFocus,
+                                textInputAction: TextInputAction.next,
+                                onSubmitted: (_) => FocusScope.of(context)
+                                    .requestFocus(_puFocus),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly
+                                ],
+                                onChanged: _onMdlChanged,
+                                scrollPadding:
+                                    const EdgeInsets.only(bottom: 80),
+                                decoration: InputDecoration(
+                                  labelText: 'MDL weight',
+                                  hintText: 'e.g., 185',
+                                  errorText: _mdlError,
+                                  suffixText: 'lbs',
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              AftStepper(
-                                value: curr,
-                                min: cfg.min.toInt(),
-                                max: cfg.max.toInt(),
-                                step: cfg.step.toInt(),
-                                displayFormatter: (v) =>
-                                    slidercfg.formatMmSs(v),
-                                semanticsLabel: 'Sprint-drag-carry time',
-                                compact: true,
-                                onChanged: (v) {
-                                  final clamped = v
-                                      .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                      .toInt();
-                                  _sdcController.text =
-                                      slidercfg.formatMmSs(clamped);
-                                  _onSdcChanged(_sdcController.text);
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.sdc);
-                          final sec = inputs.sdc?.inSeconds ??
-                              parseMmSs(_sdcController.text)?.inSeconds ??
-                              cfg.max.toInt();
-                          final curr = sec
-                              .clamp(cfg.min.toInt(), cfg.max.toInt())
-                              .toInt();
-                          return AftTimeSlider(
-                            label: 'Sprint-Drag-Carry',
-                            seconds: curr,
-                            config: cfg,
-                            reversed: true,
-                            showTicks: false,
-                            thresholds: slidercfg.getScoreThresholds(
-                              profile.standard,
-                              profile,
-                              AftEvent.sdc,
                             ),
-                            onChanged: (v) {
-                              _sdcController.text = slidercfg.formatMmSs(v);
-                              _onSdcChanged(_sdcController.text);
-                            },
-                          );
-                        },
-                      ),
-                    ],
+                            const SizedBox(width: 8),
+                            AftStepper(
+                              value: int.tryParse(_mdlController.text) ?? 0,
+                              min: 0,
+                              step: 5,
+                              compact: true,
+                              onChanged: (v) {
+                                _mdlController.text = '$v';
+                                _onMdlChanged(_mdlController.text);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.mdl);
+                            final curr = ((inputs.mdlLbs ??
+                                        int.tryParse(_mdlController.text) ??
+                                        cfg.min.toInt())
+                                    .clamp(cfg.min.toInt(), cfg.max.toInt()))
+                                .toInt();
+                            return AftIntSlider(
+                              label: 'Weight',
+                              value: curr,
+                              suffix: 'lbs',
+                              config: cfg,
+                              showTicks: false,
+                              thresholds: slidercfg.getScoreThresholds(
+                                profile.standard,
+                                profile,
+                                AftEvent.mdl,
+                              ),
+                              onChanged: (v) {
+                                _mdlController.text = '$v';
+                                _onMdlChanged(_mdlController.text);
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                // Plank card
-                AftEventCard(
-                  title: 'Plank',
-                  icon: Icons.access_time,
-                  compact: true,
-                  leading: const AftSvgIcon(
-                    'assets/icons/plank.svg',
-                    size: 24,
-                    padding: const EdgeInsets.all(2),
-                    colorFilter: const ColorFilter.mode(
-                        ArmyColors.gold, BlendMode.srcIn),
-                  ),
-                  trailing: AftScoreRing(
-                      score: computed.plankScore, size: 36, stroke: 5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.plank);
-                          final sec = inputs.plank?.inSeconds ??
-                              parseMmSs(_plankController.text)?.inSeconds ??
-                              cfg.min.toInt();
-                          final curr = sec
-                              .clamp(cfg.min.toInt(), cfg.max.toInt())
-                              .toInt();
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _plankController,
-                                  focusNode: _plankFocus,
-                                  textInputAction: TextInputAction.next,
-                                  onSubmitted: (_) => FocusScope.of(context)
-                                      .requestFocus(_runFocus),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [MmSsFormatter()],
-                                  onChanged: _onPlankChanged,
-                                  scrollPadding:
-                                      const EdgeInsets.only(bottom: 80),
-                                  decoration: InputDecoration(
-                                    labelText: 'Plank time',
-                                    hintText: 'e.g., 02:10',
-                                    errorText: _plankError,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                  ),
+                  // Push-ups card
+                  AftEventCard(
+                    title: 'Hand-Release Push-ups',
+                    icon: Icons.accessibility_new,
+                    compact: true,
+                    leading: const AftSvgIcon(
+                      'assets/icons/pushup.svg',
+                      size: 24,
+                      padding: const EdgeInsets.all(2),
+                      colorFilter: const ColorFilter.mode(
+                          ArmyColors.gold, BlendMode.srcIn),
+                    ),
+                    trailing: AftScoreRing(
+                        score: computed.pushUpsScore, size: 36, stroke: 5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _puController,
+                                focusNode: _puFocus,
+                                textInputAction: TextInputAction.next,
+                                onSubmitted: (_) => FocusScope.of(context)
+                                    .requestFocus(_sdcFocus),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly
+                                ],
+                                onChanged: _onPuChanged,
+                                scrollPadding:
+                                    const EdgeInsets.only(bottom: 80),
+                                decoration: InputDecoration(
+                                  labelText: 'Push-ups',
+                                  hintText: 'e.g., 30',
+                                  errorText: _puError,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              AftStepper(
-                                value: curr,
-                                min: cfg.min.toInt(),
-                                max: cfg.max.toInt(),
-                                step: cfg.step.toInt(),
-                                displayFormatter: (v) =>
-                                    slidercfg.formatMmSs(v),
-                                semanticsLabel: 'Plank time',
-                                compact: true,
-                                onChanged: (v) {
-                                  final clamped = v
-                                      .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                      .toInt();
-                                  _plankController.text =
-                                      slidercfg.formatMmSs(clamped);
-                                  _onPlankChanged(_plankController.text);
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.plank);
-                          final sec = inputs.plank?.inSeconds ??
-                              parseMmSs(_plankController.text)?.inSeconds ??
-                              cfg.min.toInt();
-                          final curr = sec
-                              .clamp(cfg.min.toInt(), cfg.max.toInt())
-                              .toInt();
-                          return AftTimeSlider(
-                            label: 'Plank',
-                            seconds: curr,
-                            config: cfg,
-                            showTicks: false,
-                            thresholds: slidercfg.getScoreThresholds(
-                              profile.standard,
-                              profile,
-                              AftEvent.plank,
                             ),
-                            onChanged: (v) {
-                              _plankController.text = slidercfg.formatMmSs(v);
-                              _onPlankChanged(_plankController.text);
-                            },
-                          );
-                        },
-                      ),
-                    ],
+                            const SizedBox(width: 8),
+                            AftStepper(
+                              value: int.tryParse(_puController.text) ?? 0,
+                              min: 0,
+                              step: 1,
+                              compact: true,
+                              onChanged: (v) {
+                                _puController.text = '$v';
+                                _onPuChanged(_puController.text);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.pushUps);
+                            final curr = ((inputs.pushUps ??
+                                        int.tryParse(_puController.text) ??
+                                        cfg.min.toInt())
+                                    .clamp(cfg.min.toInt(), cfg.max.toInt()))
+                                .toInt();
+                            return AftIntSlider(
+                              label: 'Repetitions',
+                              value: curr,
+                              config: cfg,
+                              showTicks: false,
+                              thresholds: slidercfg.getScoreThresholds(
+                                profile.standard,
+                                profile,
+                                AftEvent.pushUps,
+                              ),
+                              onChanged: (v) {
+                                _puController.text = '$v';
+                                _onPuChanged(_puController.text);
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                // 2-Mile Run card
-                AftEventCard(
-                  title: '2-Mile Run',
-                  icon: Icons.directions_run,
-                  compact: true,
-                  leading: const AftSvgIcon(
-                    'assets/icons/run.svg',
-                    size: 24,
-                    padding: const EdgeInsets.all(2),
-                    colorFilter: const ColorFilter.mode(
-                        ArmyColors.gold, BlendMode.srcIn),
-                  ),
-                  trailing: AftScoreRing(
-                      score: computed.run2miScore, size: 36, stroke: 5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.run2mi);
-                          final sec = inputs.run2mi?.inSeconds ??
-                              parseMmSs(_run2miController.text)?.inSeconds ??
-                              cfg.max.toInt();
-                          final curr = sec
-                              .clamp(cfg.min.toInt(), cfg.max.toInt())
-                              .toInt();
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _run2miController,
-                                  focusNode: _runFocus,
-                                  textInputAction: TextInputAction.done,
-                                  onSubmitted: (_) =>
-                                      FocusScope.of(context).unfocus(),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [MmSsFormatter()],
-                                  onChanged: _onRunChanged,
-                                  scrollPadding:
-                                      const EdgeInsets.only(bottom: 80),
-                                  decoration: InputDecoration(
-                                    labelText: '2-Mile Run time',
-                                    hintText: 'e.g., 16:45',
-                                    errorText: _run2miError,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+                  // Sprint-Drag-Carry card
+                  AftEventCard(
+                    title: 'Sprint-Drag-Carry',
+                    icon: Icons.timer_outlined,
+                    compact: true,
+                    leading: const AftSvgIcon(
+                      'assets/icons/dragcarry.svg',
+                      size: 24,
+                      padding: const EdgeInsets.all(2),
+                      colorFilter: const ColorFilter.mode(
+                          ArmyColors.gold, BlendMode.srcIn),
+                    ),
+                    trailing: AftScoreRing(
+                        score: computed.sdcScore, size: 36, stroke: 5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.sdc);
+                            final sec = inputs.sdc?.inSeconds ??
+                                parseMmSs(_sdcController.text)?.inSeconds ??
+                                cfg.max.toInt();
+                            final curr = sec
+                                .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                .toInt();
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _sdcController,
+                                    focusNode: _sdcFocus,
+                                    textInputAction: TextInputAction.next,
+                                    onSubmitted: (_) => FocusScope.of(context)
+                                        .requestFocus(_plankFocus),
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [MmSsFormatter()],
+                                    onChanged: _onSdcChanged,
+                                    scrollPadding:
+                                        const EdgeInsets.only(bottom: 80),
+                                    decoration: InputDecoration(
+                                      labelText: 'Sprint-Drag-Carry time',
+                                      hintText: 'e.g., 1:45',
+                                      errorText: _sdcError,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 8),
+                                    ),
                                   ),
                                 ),
+                                const SizedBox(width: 8),
+                                AftStepper(
+                                  value: curr,
+                                  min: cfg.min.toInt(),
+                                  max: cfg.max.toInt(),
+                                  step: cfg.step.toInt(),
+                                  displayFormatter: (v) =>
+                                      slidercfg.formatMmSs(v),
+                                  semanticsLabel: 'Sprint-drag-carry time',
+                                  compact: true,
+                                  onChanged: (v) {
+                                    final clamped = v
+                                        .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                        .toInt();
+                                    _sdcController.text =
+                                        slidercfg.formatMmSs(clamped);
+                                    _onSdcChanged(_sdcController.text);
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.sdc);
+                            final sec = inputs.sdc?.inSeconds ??
+                                parseMmSs(_sdcController.text)?.inSeconds ??
+                                cfg.max.toInt();
+                            final curr = sec
+                                .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                .toInt();
+                            return AftTimeSlider(
+                              label: 'Sprint-Drag-Carry',
+                              seconds: curr,
+                              config: cfg,
+                              reversed: true,
+                              showTicks: false,
+                              thresholds: slidercfg.getScoreThresholds(
+                                profile.standard,
+                                profile,
+                                AftEvent.sdc,
                               ),
-                              const SizedBox(width: 8),
-                              AftStepper(
-                                value: curr,
-                                min: cfg.min.toInt(),
-                                max: cfg.max.toInt(),
-                                step: 1,
-                                displayFormatter: (v) =>
-                                    slidercfg.formatMmSs(v),
-                                semanticsLabel: '2-mile run time',
-                                compact: true,
-                                onChanged: (v) {
-                                  final clamped = v
-                                      .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                      .toInt();
-                                  _run2miController.text =
-                                      slidercfg.formatMmSs(clamped);
-                                  _onRunChanged(_run2miController.text);
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final cfg = slidercfg.getSliderConfig(
-                              profile.standard, profile, AftEvent.run2mi);
-                          final sec = inputs.run2mi?.inSeconds ??
-                              parseMmSs(_run2miController.text)?.inSeconds ??
-                              cfg.max.toInt();
-                          final curr = sec
-                              .clamp(cfg.min.toInt(), cfg.max.toInt())
-                              .toInt();
-                          return AftTimeSlider(
-                            label: '2-Mile Run',
-                            seconds: curr,
-                            config: cfg,
-                            reversed: true,
-                            showTicks: false,
-                            thresholds: slidercfg.getScoreThresholds(
-                              profile.standard,
-                              profile,
-                              AftEvent.run2mi,
-                            ),
-                            onChanged: (v) {
-                              _run2miController.text = slidercfg.formatMmSs(v);
-                              _onRunChanged(_run2miController.text);
-                            },
-                          );
-                        },
-                      ),
-                    ],
+                              onChanged: (v) {
+                                _sdcController.text = slidercfg.formatMmSs(v);
+                                _onSdcChanged(_sdcController.text);
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 12),
-              ],
+                  // Plank card
+                  AftEventCard(
+                    title: 'Plank',
+                    icon: Icons.access_time,
+                    compact: true,
+                    leading: const AftSvgIcon(
+                      'assets/icons/plank.svg',
+                      size: 24,
+                      padding: EdgeInsets.all(2),
+                      colorFilter:
+                          ColorFilter.mode(ArmyColors.gold, BlendMode.srcIn),
+                    ),
+                    trailing: AftScoreRing(
+                        score: computed.plankScore, size: 36, stroke: 5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.plank);
+                            final sec = inputs.plank?.inSeconds ??
+                                parseMmSs(_plankController.text)?.inSeconds ??
+                                cfg.min.toInt();
+                            final curr = sec
+                                .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                .toInt();
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _plankController,
+                                    focusNode: _plankFocus,
+                                    textInputAction: TextInputAction.next,
+                                    onSubmitted: (_) => FocusScope.of(context)
+                                        .requestFocus(_runFocus),
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [MmSsFormatter()],
+                                    onChanged: _onPlankChanged,
+                                    scrollPadding:
+                                        const EdgeInsets.only(bottom: 80),
+                                    decoration: InputDecoration(
+                                      labelText: 'Plank time',
+                                      hintText: 'e.g., 2:10',
+                                      errorText: _plankError,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 8),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                AftStepper(
+                                  value: curr,
+                                  min: cfg.min.toInt(),
+                                  max: cfg.max.toInt(),
+                                  step: cfg.step.toInt(),
+                                  displayFormatter: (v) =>
+                                      slidercfg.formatMmSs(v),
+                                  semanticsLabel: 'Plank time',
+                                  compact: true,
+                                  onChanged: (v) {
+                                    final clamped = v
+                                        .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                        .toInt();
+                                    _plankController.text =
+                                        slidercfg.formatMmSs(clamped);
+                                    _onPlankChanged(_plankController.text);
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.plank);
+                            final sec = inputs.plank?.inSeconds ??
+                                parseMmSs(_plankController.text)?.inSeconds ??
+                                cfg.min.toInt();
+                            final curr = sec
+                                .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                .toInt();
+                            return AftTimeSlider(
+                              label: 'Plank',
+                              seconds: curr,
+                              config: cfg,
+                              showTicks: false,
+                              thresholds: slidercfg.getScoreThresholds(
+                                profile.standard,
+                                profile,
+                                AftEvent.plank,
+                              ),
+                              onChanged: (v) {
+                                _plankController.text = slidercfg.formatMmSs(v);
+                                _onPlankChanged(_plankController.text);
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 2-Mile Run card
+                  AftEventCard(
+                    title: '2-Mile Run',
+                    icon: Icons.directions_run,
+                    compact: true,
+                    leading: const AftSvgIcon(
+                      'assets/icons/run.svg',
+                      size: 24,
+                      padding: const EdgeInsets.all(2),
+                      colorFilter: const ColorFilter.mode(
+                          ArmyColors.gold, BlendMode.srcIn),
+                    ),
+                    trailing: AftScoreRing(
+                        score: computed.run2miScore, size: 36, stroke: 5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.run2mi);
+                            final sec = inputs.run2mi?.inSeconds ??
+                                parseMmSs(_run2miController.text)?.inSeconds ??
+                                cfg.max.toInt();
+                            final curr = sec
+                                .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                .toInt();
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _run2miController,
+                                    focusNode: _runFocus,
+                                    textInputAction: TextInputAction.done,
+                                    onSubmitted: (_) =>
+                                        FocusScope.of(context).unfocus(),
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [MmSsFormatter()],
+                                    onChanged: _onRunChanged,
+                                    scrollPadding:
+                                        const EdgeInsets.only(bottom: 80),
+                                    decoration: InputDecoration(
+                                      labelText: '2-Mile Run time',
+                                      hintText: 'e.g., 16:45',
+                                      errorText: _run2miError,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 8),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                AftStepper(
+                                  value: curr,
+                                  min: cfg.min.toInt(),
+                                  max: cfg.max.toInt(),
+                                  step: 1,
+                                  displayFormatter: (v) =>
+                                      slidercfg.formatMmSs(v),
+                                  semanticsLabel: '2-mile run time',
+                                  compact: true,
+                                  onChanged: (v) {
+                                    final clamped = v
+                                        .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                        .toInt();
+                                    _run2miController.text =
+                                        slidercfg.formatMmSs(clamped);
+                                    _onRunChanged(_run2miController.text);
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            final cfg = slidercfg.getSliderConfig(
+                                profile.standard, profile, AftEvent.run2mi);
+                            final sec = inputs.run2mi?.inSeconds ??
+                                parseMmSs(_run2miController.text)?.inSeconds ??
+                                cfg.max.toInt();
+                            final curr = sec
+                                .clamp(cfg.min.toInt(), cfg.max.toInt())
+                                .toInt();
+                            return AftTimeSlider(
+                              label: '2-Mile Run',
+                              seconds: curr,
+                              config: cfg,
+                              reversed: true,
+                              showTicks: false,
+                              thresholds: slidercfg.getScoreThresholds(
+                                profile.standard,
+                                profile,
+                                AftEvent.run2mi,
+                              ),
+                              onChanged: (v) {
+                                _run2miController.text =
+                                    slidercfg.formatMmSs(v);
+                                _onRunChanged(_run2miController.text);
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RankGreetingRow extends StatelessWidget {
+  const _RankGreetingRow({
+    required this.rankAbbrev,
+    required this.lastName,
+  });
+
+  final String rankAbbrev;
+  final String lastName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final assetPath = rankAssetByAbbrev[rankAbbrev];
+
+    // If insignia is missing/unavailable (PV1), show a minimal neutral glyph.
+    Widget fallbackGlyph() => Icon(
+          Icons.chevron_right,
+          size: 28,
+          color: theme.colorScheme.onSurfaceVariant,
+        );
+
+    final icon = (assetPath == null)
+        ? fallbackGlyph()
+        : SvgPicture.asset(
+            assetPath,
+            width: 56,
+            height: 56,
+            fit: BoxFit.contain,
+            semanticsLabel: '$rankAbbrev rank insignia',
+            // If decoding fails, render the neutral glyph instead of crashing.
+            placeholderBuilder: (_) => fallbackGlyph(),
+          );
+
+    // If the SVG asset is missing, AftSvgIcon falls back to empty via
+    // placeholderBuilder, and our placeholder remains visible.
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 60,
+          height: 60,
+          child: Center(child: icon),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            'Hello, $rankAbbrev $lastName',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface),
+          ),
+        ),
+      ],
     );
   }
 }

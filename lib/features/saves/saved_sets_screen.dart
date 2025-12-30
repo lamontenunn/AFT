@@ -34,13 +34,6 @@ class SavedSetsScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
-              Text(
-                'Saved tests',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
               const Spacer(),
               if (auth.isSignedIn && effectiveId != 'guest')
                 IconButton(

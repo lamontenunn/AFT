@@ -33,6 +33,9 @@ class AftSvgIcon extends StatelessWidget {
             asset,
             colorFilter: colorFilter,
             semanticsLabel: semanticLabel,
+            // If the asset is missing/can't be decoded, don't crash the UI.
+            // We render nothing and allow callers to provide their own fallback.
+            placeholderBuilder: (_) => const SizedBox.shrink(),
           ),
         ),
       ),

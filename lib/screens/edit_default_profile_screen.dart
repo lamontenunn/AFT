@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
+import 'package:aft_firebase_app/features/proctor/tools/body_fat.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 
 class EditDefaultProfileScreen extends ConsumerStatefulWidget {
@@ -15,6 +16,39 @@ class EditDefaultProfileScreen extends ConsumerStatefulWidget {
 class _EditDefaultProfileScreenState
     extends ConsumerState<EditDefaultProfileScreen> {
   late DefaultProfileSettings _draft;
+
+  static const List<String> _armyPayGrades = <String>[
+    // Enlisted
+    'E-1',
+    'E-2',
+    'E-3',
+    'E-4',
+    'E-5',
+    'E-6',
+    'E-7',
+    'E-8',
+    'E-9',
+    // Warrant
+    'W-1',
+    'W-2',
+    'W-3',
+    'W-4',
+    'W-5',
+    // Officer
+    'O-1',
+    'O-2',
+    'O-3',
+    'O-4',
+    'O-5',
+    'O-6',
+    'O-7',
+    'O-8',
+    'O-9',
+    // Prior-enlisted officer
+    'O-1E',
+    'O-2E',
+    'O-3E',
+  ];
 
   late final TextEditingController _firstCtrl;
   late final TextEditingController _miCtrl;
@@ -104,6 +138,111 @@ class _EditDefaultProfileScreenState
 
   void _setDraft(DefaultProfileSettings next) {
     setState(() => _draft = next);
+  }
+
+  void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
+
+  Future<void> _pickPayGrade() async {
+    _dismissKeyboard();
+
+    final theme = Theme.of(context);
+    final current = _payGradeCtrl.text.trim();
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: theme.colorScheme.surface,
+      builder: (ctx) {
+        Widget header(String label) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            child: Text(
+              label,
+              style: Theme.of(ctx)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          );
+        }
+
+        List<String> section(List<String> items) => items;
+
+        final enlisted =
+            section(_armyPayGrades.where((e) => e.startsWith('E-')).toList());
+        final warrant =
+            section(_armyPayGrades.where((e) => e.startsWith('W-')).toList());
+        final officer = section(
+          _armyPayGrades
+              .where((e) => e.startsWith('O-') && !e.endsWith('E'))
+              .toList(),
+        );
+        final officerE =
+            section(_armyPayGrades.where((e) => e.endsWith('E')).toList());
+
+        final all = <({String? header, String? value})>[
+          (header: 'Enlisted', value: null),
+          for (final v in enlisted) (header: null, value: v),
+          (header: 'Warrant Officer', value: null),
+          for (final v in warrant) (header: null, value: v),
+          (header: 'Officer', value: null),
+          for (final v in officer) (header: null, value: v),
+          (header: 'Officer (Prior Enlisted)', value: null),
+          for (final v in officerE) (header: null, value: v),
+        ];
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Select Pay Grade'),
+                trailing: TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(''),
+                  child: const Text('Clear'),
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: all.length,
+                  itemBuilder: (ctx, i) {
+                    final item = all[i];
+                    final h = item.header;
+                    final v = item.value;
+                    if (h != null) return header(h);
+                    final selected = v == current;
+                    return ListTile(
+                      title: Text(v!),
+                      trailing:
+                          selected ? const Icon(Icons.check, size: 18) : null,
+                      onTap: () => Navigator.of(ctx).pop(v),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null) return;
+    if (selected.isEmpty) {
+      setState(() {
+        _payGradeCtrl.text = '';
+        // Keep draft in sync so other UI that depends on _draft updates too.
+        _draft = _draft.copyWith(clearPayGrade: true);
+      });
+      return;
+    }
+    setState(() {
+      _payGradeCtrl.text = selected;
+      _draft = _draft.copyWith(payGrade: selected);
+    });
   }
 
   Future<void> _pickBirthdate() async {
@@ -432,6 +571,227 @@ class _EditDefaultProfileScreenState
     return '${_draft.bodyFatPercent!.toStringAsFixed(1)}%';
   }
 
+  Future<void> _openBodyFatCalculator() async {
+    final theme = Theme.of(context);
+
+    // Sex: fall back to current draft sex (or Male if unset)
+    AftSex sex = _draft.sex ?? AftSex.male;
+
+    // We don't store age directly on the DefaultProfileSettings; we can derive it
+    // from DOB if present, otherwise default to 25.
+    final derivedAge =
+        _draft.birthdate == null ? 25 : _ageFromDob(_draft.birthdate!);
+    int age = derivedAge.clamp(17, 80);
+
+    // Weight: draft weight is stored in either lb or kg depending on measurementSystem.
+    double? weightLbs;
+    if (_draft.weight != null) {
+      weightLbs = _draft.measurementSystem == MeasurementSystem.metric
+          ? _draft.weight! / 0.45359237
+          : _draft.weight!;
+    }
+
+    final ageCtrl = TextEditingController(text: '$age');
+    final weightCtrl = TextEditingController(
+      text: weightLbs == null ? '' : weightLbs.toStringAsFixed(1),
+    );
+    final abdomenCtrl = TextEditingController();
+
+    BodyFatResult? result;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: theme.colorScheme.surface,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          void recompute() {
+            final w = double.tryParse(weightCtrl.text.trim());
+            final a = double.tryParse(abdomenCtrl.text.trim());
+            if (w == null || a == null || w <= 0 || a <= 0) {
+              setState(() => result = null);
+              return;
+            }
+            setState(() {
+              result = estimateBodyFat(
+                sex: sex,
+                age: age,
+                weightLbs: w,
+                abdomenIn: a,
+              );
+            });
+          }
+
+          final pass = result?.isPass;
+
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => FocusScope.of(ctx).unfocus(),
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Spacer(),
+                        Text(
+                          'Body Fat Calculator',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                          textAlign: TextAlign.center,
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Done',
+                          onPressed: () => FocusScope.of(ctx).unfocus(),
+                          icon: const Icon(Icons.keyboard_hide_outlined),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<AftSex>(
+                      segments: const [
+                        ButtonSegment(value: AftSex.male, label: Text('Male')),
+                        ButtonSegment(
+                            value: AftSex.female, label: Text('Female')),
+                      ],
+                      selected: {sex},
+                      onSelectionChanged: (sel) {
+                        if (sel.isEmpty) return;
+                        setState(() => sex = sel.first);
+                        recompute();
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: ageCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Age',
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) {
+                              final parsed = int.tryParse(v.trim());
+                              if (parsed == null) return;
+                              setState(() => age = parsed.clamp(17, 80));
+                              recompute();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: weightCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Weight (lb)',
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) => recompute(),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: abdomenCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Abdomen (in)',
+                        isDense: true,
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => recompute(),
+                    ),
+                    const SizedBox(height: 14),
+                    if (result != null)
+                      Card(
+                        elevation: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Estimated BF%: ${result!.bodyFatPercent.toStringAsFixed(1)}%',
+                                style: theme.textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Max allowable: ${result!.maxAllowablePercent.toStringAsFixed(0)}%',
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                pass == true ? 'PASS' : 'FAIL',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color:
+                                      pass == true ? Colors.green : Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        'Enter age, weight, and abdomen to calculate.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Close'),
+                        ),
+                        const Spacer(),
+                        FilledButton.icon(
+                          onPressed: result == null
+                              ? null
+                              : () {
+                                  _setDraft(_draft.copyWith(
+                                    bodyFatPercent: result!.bodyFatPercent,
+                                  ));
+                                  Navigator.of(ctx).pop();
+                                },
+                          icon: const Icon(Icons.check),
+                          label: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    // NOTE: Don't manually dispose these controllers here.
+    // The bottom-sheet uses them during its closing animation; disposing here
+    // can trigger "TextEditingController used after being disposed".
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -446,164 +806,205 @@ class _EditDefaultProfileScreenState
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          Text('Name',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _firstCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'First',
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 72,
-                child: TextField(
-                  controller: _miCtrl,
-                  maxLength: 1,
-                  decoration: const InputDecoration(
-                    labelText: 'MI',
-                    counterText: '',
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _lastCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Last',
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text('Service',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _unitCtrl,
-            decoration: const InputDecoration(labelText: 'Unit', isDense: true),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _mosCtrl,
-                  decoration:
-                      const InputDecoration(labelText: 'MOS', isDense: true),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _payGradeCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Pay Grade', isDense: true),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('On profile'),
-            value: _draft.onProfile,
-            onChanged: (v) => _setDraft(_draft.copyWith(onProfile: v)),
-          ),
-          const SizedBox(height: 18),
-          Text('Demographics',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.cake_outlined),
-            title: const Text('Birthdate'),
-            subtitle: Text(
-              _draft.birthdate == null
-                  ? 'Not set'
-                  : '${_ymd(_draft.birthdate!)} (Age today: ${_ageFromDob(_draft.birthdate!)})',
-            ),
-            trailing: Wrap(
-              spacing: 8,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _dismissKeyboard,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Text('Name',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Row(
               children: [
-                TextButton(onPressed: _pickBirthdate, child: const Text('Set')),
-                if (_draft.birthdate != null)
-                  TextButton(
-                      onPressed: _clearBirthdate, child: const Text('Clear')),
+                Expanded(
+                  child: TextField(
+                    controller: _firstCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'First',
+                      isDense: true,
+                    ),
+                    onTapOutside: (_) => _dismissKeyboard(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 72,
+                  child: TextField(
+                    controller: _miCtrl,
+                    maxLength: 1,
+                    decoration: const InputDecoration(
+                      labelText: 'MI',
+                      counterText: '',
+                      isDense: true,
+                    ),
+                    onTapOutside: (_) => _dismissKeyboard(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _lastCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Last',
+                      isDense: true,
+                    ),
+                    onTapOutside: (_) => _dismissKeyboard(),
+                  ),
+                ),
               ],
             ),
-          ),
-          SegmentedButton<AftSex>(
-            segments: const [
-              ButtonSegment(value: AftSex.male, label: Text('Male')),
-              ButtonSegment(value: AftSex.female, label: Text('Female')),
-            ],
-            selected: {_draft.sex ?? AftSex.male},
-            onSelectionChanged: (sel) {
-              if (sel.isEmpty) return;
-              _setDraft(_draft.copyWith(sex: sel.first));
-            },
-          ),
-          const SizedBox(height: 18),
-          Text('Body composition',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          SegmentedButton<MeasurementSystem>(
-            segments: const [
-              ButtonSegment(
-                  value: MeasurementSystem.imperial, label: Text('Imperial')),
-              ButtonSegment(
-                  value: MeasurementSystem.metric, label: Text('Metric')),
-            ],
-            selected: {_draft.measurementSystem},
-            onSelectionChanged: (sel) {
-              if (sel.isEmpty) return;
-              _toggleMeasurementSystem(sel.first);
-            },
-          ),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.height),
-            title: const Text('Height'),
-            subtitle: Text(_heightLabel()),
-            trailing:
-                TextButton(onPressed: _editHeight, child: const Text('Edit')),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.monitor_weight_outlined),
-            title: const Text('Weight'),
-            subtitle: Text(_weightLabel()),
-            trailing:
-                TextButton(onPressed: _editWeight, child: const Text('Edit')),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.percent),
-            title: const Text('Body fat %'),
-            subtitle: Text(_bodyFatLabel()),
-            trailing:
-                TextButton(onPressed: _editBodyFat, child: const Text('Edit')),
-          ),
-        ],
+            const SizedBox(height: 18),
+            Text('Service',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _unitCtrl,
+              decoration:
+                  const InputDecoration(labelText: 'Unit', isDense: true),
+              onTapOutside: (_) => _dismissKeyboard(),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _mosCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'MOS', isDense: true),
+                    onTapOutside: (_) => _dismissKeyboard(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Pay Grade',
+                      isDense: true,
+                    ),
+                    child: InkWell(
+                      onTap: _pickPayGrade,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _payGradeCtrl.text.trim().isEmpty
+                                    ? 'Select'
+                                    : _payGradeCtrl.text.trim(),
+                                style: theme.textTheme.bodyLarge,
+                              ),
+                            ),
+                            const Icon(Icons.arrow_drop_down),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('On profile'),
+              value: _draft.onProfile,
+              onChanged: (v) => _setDraft(_draft.copyWith(onProfile: v)),
+            ),
+            const SizedBox(height: 18),
+            Text('Demographics',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.cake_outlined),
+              title: const Text('Birthdate'),
+              subtitle: Text(
+                _draft.birthdate == null
+                    ? 'Not set'
+                    : '${_ymd(_draft.birthdate!)} (Age today: ${_ageFromDob(_draft.birthdate!)})',
+              ),
+              trailing: Wrap(
+                spacing: 8,
+                children: [
+                  TextButton(
+                      onPressed: _pickBirthdate, child: const Text('Set')),
+                  if (_draft.birthdate != null)
+                    TextButton(
+                        onPressed: _clearBirthdate, child: const Text('Clear')),
+                ],
+              ),
+            ),
+            SegmentedButton<AftSex>(
+              segments: const [
+                ButtonSegment(value: AftSex.male, label: Text('Male')),
+                ButtonSegment(value: AftSex.female, label: Text('Female')),
+              ],
+              selected: {_draft.sex ?? AftSex.male},
+              onSelectionChanged: (sel) {
+                if (sel.isEmpty) return;
+                _setDraft(_draft.copyWith(sex: sel.first));
+              },
+            ),
+            const SizedBox(height: 18),
+            Text('Body composition',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            SegmentedButton<MeasurementSystem>(
+              segments: const [
+                ButtonSegment(
+                    value: MeasurementSystem.imperial, label: Text('Imperial')),
+                ButtonSegment(
+                    value: MeasurementSystem.metric, label: Text('Metric')),
+              ],
+              selected: {_draft.measurementSystem},
+              onSelectionChanged: (sel) {
+                if (sel.isEmpty) return;
+                _toggleMeasurementSystem(sel.first);
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.height),
+              title: const Text('Height'),
+              subtitle: Text(_heightLabel()),
+              trailing:
+                  TextButton(onPressed: _editHeight, child: const Text('Edit')),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.monitor_weight_outlined),
+              title: const Text('Weight'),
+              subtitle: Text(_weightLabel()),
+              trailing:
+                  TextButton(onPressed: _editWeight, child: const Text('Edit')),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.percent),
+              title: const Text('Body fat %'),
+              subtitle: Text(_bodyFatLabel()),
+              trailing: Wrap(
+                spacing: 8,
+                children: [
+                  IconButton(
+                    tooltip: 'Calculate',
+                    icon: const Icon(Icons.calculate_outlined),
+                    onPressed: _openBodyFatCalculator,
+                  ),
+                  TextButton(
+                      onPressed: _editBodyFat, child: const Text('Edit')),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

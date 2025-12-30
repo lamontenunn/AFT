@@ -83,7 +83,6 @@ class _TopControls extends ConsumerWidget {
     final bands = ref.watch(bandsProvider);
     final ctrl = ref.read(standardsSelectionProvider.notifier);
     final theme = Theme.of(context);
-    final disabledGender = sel.combat; // Combat forces male thresholds
     final outline = theme.colorScheme.outline;
     final onSurface = theme.colorScheme.onSurface;
 
@@ -205,14 +204,13 @@ class _TopControls extends ConsumerWidget {
                 filterChip(
                   label: 'M',
                   selected: sel.sex == AftSex.male,
-                  onTap: disabledGender ? null : () => ctrl.setSex(AftSex.male),
+                  onTap: () => ctrl.setSex(AftSex.male),
                 ),
                 const SizedBox(width: 8),
                 filterChip(
                   label: 'F',
                   selected: sel.sex == AftSex.female,
-                  onTap:
-                      disabledGender ? null : () => ctrl.setSex(AftSex.female),
+                  onTap: () => ctrl.setSex(AftSex.female),
                 ),
                 const SizedBox(width: 12),
                 filterChip(
