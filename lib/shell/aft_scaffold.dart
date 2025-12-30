@@ -32,7 +32,8 @@ class AftScaffold extends ConsumerWidget {
       Routes.home => 0,
       Routes.standards => 1,
       Routes.savedSets => 2,
-      Routes.settings => 3,
+      Routes.proctor => 3,
+      Routes.settings => 4,
       _ => 0,
     };
 
@@ -65,7 +66,8 @@ class AftScaffold extends ConsumerWidget {
               0 => Routes.home,
               1 => Routes.standards,
               2 => Routes.savedSets,
-              3 => Routes.settings,
+              3 => Routes.proctor,
+              4 => Routes.settings,
               _ => Routes.home,
             };
             Navigator.of(context).pushReplacementNamed(nextRoute);
@@ -85,6 +87,11 @@ class AftScaffold extends ConsumerWidget {
               icon: Icon(Icons.folder_outlined),
               selectedIcon: Icon(Icons.folder),
               label: 'Saved Tests',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.timer_outlined),
+              selectedIcon: Icon(Icons.timer),
+              label: 'Proctor',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),
@@ -110,7 +117,19 @@ class AftScaffold extends ConsumerWidget {
               foregroundColor: Colors.black,
               elevation: 0,
               centerTitle: true,
-              title: const SizedBox.shrink(),
+              title: Text(
+                switch (routeName) {
+                  Routes.home => 'Home',
+                  Routes.savedSets => 'Saved Sets',
+                  Routes.proctor => 'Proctor',
+                  Routes.settings => 'Settings',
+                  _ => 'AFT',
+                },
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w900),
+              ),
               actions: [
                 if (routeName == Routes.home) ...[
                   _TopBarSaveCancelActions(routeName: routeName),

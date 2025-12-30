@@ -1,39 +1,56 @@
 import 'package:flutter/services.dart';
 
-/// Parses a mm:ss string into a Duration. Returns null if invalid.
+/// Parses a m:ss or mm:ss string into a Duration. Returns null if invalid.
 Duration? parseMmSs(String value) {
-  final parts = value.split(':');
+  final v = value.trim();
+  final parts = v.split(':');
   if (parts.length != 2) return null;
+  if (parts[0].isEmpty || parts[1].isEmpty) return null;
+  // Accept single-digit minutes for SDC/PLK UX (e.g. 3:25).
+  // Also still accepts mm:ss.
   final m = int.tryParse(parts[0]);
+  // For better typing UX, accept 1-2 digit seconds (3:5 -> 3:05).
+  if (parts[1].length < 1 || parts[1].length > 2) return null;
   final s = int.tryParse(parts[1]);
   if (m == null || s == null || m < 0 || s < 0 || s > 59) return null;
   return Duration(minutes: m, seconds: s);
 }
 
-/// Formats a Duration as mm:ss (zero-padded).
+/// Formats a Duration as m:ss (minutes not padded; seconds padded).
+/// Example: 3:05, 12:34
 String formatMmSs(Duration d) {
   final mm = d.inMinutes;
   final ss = d.inSeconds % 60;
-  return '${mm.toString().padLeft(2, '0')}:${ss.toString().padLeft(2, '0')}';
+  return '${mm.toString()}:${ss.toString().padLeft(2, '0')}';
 }
 
-/// Basic mm:ss input formatter.
-/// - Only digits are accepted; a colon is inserted after 2 digits
-/// - Limits length to 5 (mm:ss)
+/// Basic time input formatter for m:ss and mm:ss.
+/// - Only digits are accepted.
+/// - Digits are interpreted as:
+///   - 0-2 digits: minutes (still typing)
+///   - 3 digits: m:ss
+///   - 4 digits: mm:ss
+/// - This keeps typing intuitive:
+///   - SDC/PLK: 3:25 => type 325
+///   - 2MR: 16:45 => type 1645
 class MmSsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    var text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (text.length > 4) text = text.substring(0, 4);
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 4) digits = digits.substring(0, 4);
 
     String formatted;
-    if (text.length <= 2) {
-      formatted = text;
+    if (digits.length <= 2) {
+      formatted = digits;
+    } else if (digits.length == 3) {
+      // m:ss
+      formatted = '${digits.substring(0, 1)}:${digits.substring(1)}';
     } else {
-      formatted = '${text.substring(0, 2)}:${text.substring(2)}';
+      // mm:ss
+      formatted = '${digits.substring(0, 2)}:${digits.substring(2)}';
     }
 
     return TextEditingValue(

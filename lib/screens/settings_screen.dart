@@ -67,69 +67,6 @@ class SettingsScreen extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        // Header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Text(
-            'Settings',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ),
-
-        // Coming soon banner (Theme toggle temporarily disabled)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Card(
-            color:
-                Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Theme selection is coming soon. Dark mode is currently the default.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // Appearance
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            'Appearance',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(value: ThemeMode.system, label: Text('System')),
-              ButtonSegment(value: ThemeMode.light, label: Text('Light')),
-              ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
-            ],
-            selected: {settings.themeMode},
-            onSelectionChanged: null, // Disabled: coming soon
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Divider(height: 1),
-
         // Profile (read-only)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -323,6 +260,55 @@ class SettingsScreen extends ConsumerWidget {
               },
             );
           },
+        ),
+
+        // Appearance (moved to bottom)
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            'Appearance',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: Card(
+            color:
+                Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.6),
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Theme selection is coming soon. Dark mode is currently the default.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SegmentedButton<ThemeMode>(
+            segments: const [
+              ButtonSegment(value: ThemeMode.system, label: Text('System')),
+              ButtonSegment(value: ThemeMode.light, label: Text('Light')),
+              ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+            ],
+            selected: {settings.themeMode},
+            onSelectionChanged: null, // Disabled: coming soon
+          ),
         ),
         const SizedBox(height: 12),
       ],

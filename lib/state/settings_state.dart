@@ -15,6 +15,10 @@ class DefaultProfileSettings {
   final String? lastName;
   final String? middleInitial;
 
+  /// Rank abbreviation for greetings/insignia (e.g., "SGT", "SSG", "CPT", "PV1").
+  /// NOTE: This is stored as an abbrev string (not pay grade).
+  final String? rankAbbrev;
+
   final AftSex? sex;
   final DateTime? birthdate;
 
@@ -45,6 +49,7 @@ class DefaultProfileSettings {
     this.firstName,
     this.lastName,
     this.middleInitial,
+    this.rankAbbrev,
     this.sex,
     this.birthdate,
     this.unit,
@@ -64,6 +69,8 @@ class DefaultProfileSettings {
     bool clearLastName = false,
     String? middleInitial,
     bool clearMiddleInitial = false,
+    String? rankAbbrev,
+    bool clearRankAbbrev = false,
     AftSex? sex,
     bool clearSex = false,
     DateTime? birthdate,
@@ -88,6 +95,7 @@ class DefaultProfileSettings {
       lastName: clearLastName ? null : (lastName ?? this.lastName),
       middleInitial:
           clearMiddleInitial ? null : (middleInitial ?? this.middleInitial),
+      rankAbbrev: clearRankAbbrev ? null : (rankAbbrev ?? this.rankAbbrev),
       sex: clearSex ? null : (sex ?? this.sex),
       birthdate: clearBirthdate ? null : (birthdate ?? this.birthdate),
       unit: clearUnit ? null : (unit ?? this.unit),
@@ -164,6 +172,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   static const _kDpFirstName = 'settings_defaultProfile_firstName';
   static const _kDpLastName = 'settings_defaultProfile_lastName';
   static const _kDpMiddleInitial = 'settings_defaultProfile_middleInitial';
+  static const _kDpRankAbbrev = 'settings_defaultProfile_rankAbbrev';
   static const _kDpUnit = 'settings_defaultProfile_unit';
   static const _kDpMos = 'settings_defaultProfile_mos';
   static const _kDpPayGrade = 'settings_defaultProfile_payGrade';
@@ -191,6 +200,7 @@ class SettingsController extends StateNotifier<SettingsState> {
       firstName: _emptyToNull(prefs.getString(_kDpFirstName)),
       lastName: _emptyToNull(prefs.getString(_kDpLastName)),
       middleInitial: _emptyToNull(prefs.getString(_kDpMiddleInitial)),
+      rankAbbrev: _emptyToNull(prefs.getString(_kDpRankAbbrev)),
       unit: _emptyToNull(prefs.getString(_kDpUnit)),
       mos: _emptyToNull(prefs.getString(_kDpMos)),
       payGrade: _emptyToNull(prefs.getString(_kDpPayGrade)),
@@ -236,6 +246,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     await setOrRemoveString(_kDpFirstName, profile.firstName);
     await setOrRemoveString(_kDpLastName, profile.lastName);
     await setOrRemoveString(_kDpMiddleInitial, profile.middleInitial);
+    await setOrRemoveString(_kDpRankAbbrev, profile.rankAbbrev);
     await setOrRemoveString(_kDpUnit, profile.unit);
     await setOrRemoveString(_kDpMos, profile.mos);
     await setOrRemoveString(_kDpPayGrade, profile.payGrade);
