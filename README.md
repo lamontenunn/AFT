@@ -1,7 +1,7 @@
 # AFT – Internal Developer README (Flutter + Firebase)
 
 This repo contains a multi-platform Flutter app for Army Fitness Test (AFT) scoring and proctoring utilities.
-It is built for **internal/team** use: the goal is for another developer (or an AI agent) to be able to onboard quickly, locate the right files, and make safe changes.
+It is built for **internal/team**
 
 **Tech:** Flutter (3.22+), Dart (3.5+), Riverpod (Notifier API), Firebase Auth, SharedPreferences.
 
@@ -23,6 +23,10 @@ It is built for **internal/team** use: the goal is for another developer (or an 
 - [12. Testing](#12-testing)
 - [13. Troubleshooting](#13-troubleshooting)
 - [14. Contributing / conventions](#14-contributing--conventions)
+
+Additional docs:
+
+- [Auth documentation](docs/auth.md)
 
 ---
 
