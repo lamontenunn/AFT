@@ -289,6 +289,22 @@ flutter test
 
 There are both unit and widget tests under `test/`.
 
+### Integration tests
+
+```bash
+# Run on a simulator/emulator or device
+flutter test integration_test
+
+# Run on a specific device
+flutter test integration_test/app_smoke_test.dart -d <deviceId>
+
+# Optional: use flutter drive (legacy runner)
+flutter drive --driver test_driver/integration_test.dart --target integration_test/app_smoke_test.dart -d <deviceId>
+```
+
+Note: The smoke test only asserts the app boots into either Sign in or Home,
+so it should pass regardless of current auth state.
+
 ---
 
 ## 13. Troubleshooting
