@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/features/saves/guest_migration.dart';
+import 'package:aft_firebase_app/features/auth/password_reset_links.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
@@ -29,8 +30,10 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     setState(fn);
   }
 
-  String _friendlyAuthError(FirebaseAuthException e) {
-    switch (e.code) {
+  String _friendlyAuthError(FirebaseAuthException e,
+      {bool includeCode = false}) {
+    final message = () {
+      switch (e.code) {
       case 'invalid-email':
         return 'Enter a valid email address.';
       case 'user-disabled':
@@ -53,7 +56,10 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         return 'Network error. Check your connection and try again.';
       default:
         return e.message ?? 'Authentication failed.';
-    }
+      }
+    }();
+    if (!includeCode) return message;
+    return '$message (code: ${e.code})';
   }
 
   String? _validateEmail(String? value) {
@@ -148,12 +154,23 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     });
     FocusScope.of(context).unfocus();
     try {
-      await auth.sendPasswordResetEmail(email: email);
+      final settings = PasswordResetLinks.buildActionCodeSettings();
+      if (settings == null) {
+        await auth.sendPasswordResetEmail(email: email);
+      } else {
+        await auth.sendPasswordResetEmail(
+          email: email,
+          actionCodeSettings: settings,
+        );
+      }
       _setStateIfMounted(
-        () => _info = 'Password reset email sent to $email',
+        () => _info =
+            'Password reset request sent to $email. If you do not receive it, '
+            'check spam/junk or try a different email provider.',
       );
     } on FirebaseAuthException catch (e) {
-      _setStateIfMounted(() => _error = _friendlyAuthError(e));
+      _setStateIfMounted(
+          () => _error = _friendlyAuthError(e, includeCode: true));
     } catch (e) {
       _setStateIfMounted(() => _error = 'Failed to send reset email: $e');
     } finally {

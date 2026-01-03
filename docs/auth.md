@@ -225,6 +225,7 @@ Current sign-in methods:
    - Create account uses createUserWithEmailAndPassword.
    - If the current user is anonymous, create account uses linkWithCredential to keep the same uid.
    - Password reset uses sendPasswordResetEmail.
+   - When PasswordResetLinks is configured, sendPasswordResetEmail passes ActionCodeSettings to open the reset flow in-app.
 
 2. Continue as Guest
    - Calls FirebaseAuth.signInAnonymously().
@@ -234,6 +235,32 @@ Navigation:
 
 - The page attempts to Navigator.pop() after successful sign-in.
 - AuthGate will rebuild to the signed-in shell when authStateChanges() emits a user.
+
+---
+
+## In-app password reset (App Links / Universal Links)
+
+Files:
+
+- lib/features/auth/password_reset_links.dart
+- lib/features/auth/reset_password_screen.dart
+- lib/app.dart (app link handler)
+
+Flow:
+
+1. SignInPage sends sendPasswordResetEmail with ActionCodeSettings.
+2. Firebase sends a link that opens the app (universal link/app link).
+3. App listens for app links and routes to ResetPasswordScreen.
+4. ResetPasswordScreen verifies the code and completes confirmPasswordReset.
+
+Required configuration:
+
+- Set PasswordResetLinks.appLinkDomain to your universal link domain.
+- Update ios/Runner/Runner.entitlements with applinks:<your-domain>.
+- Update android/app/src/main/AndroidManifest.xml intent filter host.
+- Host Apple App Site Association (/.well-known/apple-app-site-association).
+- Host Android assetlinks.json (/.well-known/assetlinks.json).
+- Add the domain to Firebase Auth authorized domains.
 
 ---
 
