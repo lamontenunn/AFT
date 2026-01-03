@@ -6,6 +6,10 @@ import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
+import 'package:aft_firebase_app/features/proctor/state/providers.dart';
+import 'package:aft_firebase_app/features/proctor/state/proctor_inputs.dart';
+import 'package:aft_firebase_app/features/proctor/state/proctor_ui_state.dart';
+import 'package:aft_firebase_app/features/proctor/timing/timer_controller.dart';
 
 /// Auth transition listener for migration and user-scoped state resets.
 final authSideEffectsProvider = Provider<void>((ref) {
@@ -19,6 +23,11 @@ final authSideEffectsProvider = Provider<void>((ref) {
         ref.read(editingSetProvider.notifier).state = null;
         ref.invalidate(aftRepositoryProvider);
         ref.invalidate(settingsProvider);
+        ref.invalidate(proctorSessionProvider);
+        ref.invalidate(proctorInputsStateProvider);
+        ref.invalidate(proctorTimingProvider);
+        ref.invalidate(proctorProfileProvider);
+        ref.invalidate(proctorUiProvider);
       }
 
       if (user == null) return;
