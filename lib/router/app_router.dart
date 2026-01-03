@@ -24,7 +24,9 @@ class AppRouter {
         return PageRouteBuilder(
           settings: settings,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const AuthGate(),
+              const AuthGate(
+                child: AftScaffold(showHeader: true, child: FeatureHomeScreen()),
+              ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             // No transition to prevent shell (AppBar/BottomNav) double-render during switches
             return child;
@@ -36,7 +38,9 @@ class AppRouter {
         return PageRouteBuilder(
           settings: settings,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const AftScaffold(showHeader: false, child: StandardsScreen()),
+              const AuthGate(
+                child: AftScaffold(showHeader: false, child: StandardsScreen()),
+              ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return child;
           },
@@ -47,7 +51,9 @@ class AppRouter {
         return PageRouteBuilder(
           settings: settings,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const AftScaffold(showHeader: false, child: SavedSetsScreen()),
+              const AuthGate(
+                child: AftScaffold(showHeader: false, child: SavedSetsScreen()),
+              ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return child;
           },
@@ -58,7 +64,9 @@ class AppRouter {
         return PageRouteBuilder(
           settings: settings,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const AftScaffold(showHeader: false, child: ProctorScreen()),
+              const AuthGate(
+                child: AftScaffold(showHeader: false, child: ProctorScreen()),
+              ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return child;
           },
@@ -69,7 +77,9 @@ class AppRouter {
         return PageRouteBuilder(
           settings: settings,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const AftScaffold(showHeader: false, child: SettingsScreen()),
+              const AuthGate(
+                child: AftScaffold(showHeader: false, child: SettingsScreen()),
+              ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return child;
           },

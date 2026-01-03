@@ -59,11 +59,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyC7IYCyExhiNpMYReqU-qLwidj-90q5-Iw',
-    appId: '1:109820847091:ios:f079a741dda0bc9665a886',
+    appId: '1:109820847091:ios:e3f686da70448e6765a886',
     messagingSenderId: '109820847091',
     projectId: 'aft-firebase-app-1760071390',
     storageBucket: 'aft-firebase-app-1760071390.firebasestorage.app',
-    iosBundleId: 'com.example.aftFirebaseApp',
+    iosBundleId: 'com.lamontenunn.aftApp',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -83,4 +83,5 @@ class DefaultFirebaseOptions {
     authDomain: 'aft-firebase-app-1760071390.firebaseapp.com',
     storageBucket: 'aft-firebase-app-1760071390.firebasestorage.app',
   );
+
 }

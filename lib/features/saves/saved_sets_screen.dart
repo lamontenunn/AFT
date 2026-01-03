@@ -18,14 +18,16 @@ class SavedSetsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
-    final effectiveId = ref.watch(effectiveUserIdProvider);
+    final isGuest = ref.watch(isGuestUserProvider);
 
-    // If signed out and not using guest, show simple body message (no nested Scaffold).
-    if (!auth.isSignedIn && effectiveId != 'guest') {
+    // Signed-out users cannot access saved tests.
+    if (!auth.isSignedIn) {
       return const Center(child: Text('Sign in to view saved tests'));
     }
 
+    final effectiveId = ref.watch(effectiveUserIdProvider);
     return FutureBuilder<List<ScoreSet>>(
+      key: ValueKey(effectiveId),
       future:
           ref.read(aftRepositoryProvider).listScoreSets(userId: effectiveId),
       builder: (context, snapshot) {
@@ -35,13 +37,15 @@ class SavedSetsScreen extends ConsumerWidget {
           child: Row(
             children: [
               const Spacer(),
-              if (auth.isSignedIn && effectiveId != 'guest')
+              if (auth.isSignedIn && !isGuest)
                 IconButton(
                   tooltip: 'Merge guest data',
                   icon: const Icon(Icons.merge_type_outlined),
                   onPressed: () async {
                     final uid = auth.userId!;
-                    await GuestMigration.maybeMigrateGuestTo(uid);
+                    await ref
+                        .read(guestMigrationProvider)
+                        .maybeMigrateGuestTo(uid);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

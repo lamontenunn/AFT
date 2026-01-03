@@ -18,10 +18,19 @@ final firebaseUserProvider = StreamProvider<User?>((ref) {
   return auth.authStateChanges();
 });
 
+/// Current Firebase user (fallback to currentUser while stream loads).
+final authUserProvider = Provider<User?>((ref) {
+  final asyncUser = ref.watch(firebaseUserProvider);
+  final auth = ref.watch(firebaseAuthProvider);
+  return asyncUser.maybeWhen(
+    data: (user) => user,
+    orElse: () => auth?.currentUser,
+  );
+});
+
 /// Map Firebase user to our AuthState (non-async for easy consumption in UI)
 final authStateProvider = Provider<AuthState>((ref) {
-  final asyncUser = ref.watch(firebaseUserProvider);
-  final user = asyncUser.asData?.value;
+  final user = ref.watch(authUserProvider);
   if (user == null) {
     return const AuthState.signedOut();
   }
@@ -32,19 +41,35 @@ final authStateProvider = Provider<AuthState>((ref) {
   );
 });
 
+/// True when the current user is anonymous.
+final isGuestUserProvider = Provider<bool>((ref) {
+  final user = ref.watch(authUserProvider);
+  return user != null && user.isAnonymous;
+});
+
 /// Convenience provider to expose auth actions
 final effectiveUserIdProvider = Provider<String>((ref) {
-  final asyncUser = ref.watch(firebaseUserProvider);
-  final user = asyncUser.asData?.value;
-  if (user == null || user.isAnonymous) return 'guest';
+  final user = ref.watch(authUserProvider);
+  if (user == null) return 'signed-out';
+  if (user.isAnonymous) return 'guest:${user.uid}';
   return user.uid;
 });
 
 final authActionsProvider = Provider<_AuthActions>((ref) {
   final auth = ref.read(firebaseAuthProvider);
   return _AuthActions(
-    signInAnonymously: () => auth!.signInAnonymously(),
-    signOut: () => auth!.signOut(),
+    signInAnonymously: () {
+      if (auth == null) {
+        return Future.error(StateError('Auth not initialized'));
+      }
+      return auth.signInAnonymously();
+    },
+    signOut: () {
+      if (auth == null) {
+        return Future.error(StateError('Auth not initialized'));
+      }
+      return auth.signOut();
+    },
   );
 });
 

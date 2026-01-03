@@ -1,0 +1,267 @@
+⸻
+
+Auth Threat Model & Failure Modes (Current System)
+
+System summary (context)
+	•	Auth source of truth: FirebaseAuth.authStateChanges() + authUserProvider fallback while stream loads
+	•	Routing: AuthGate uses firebaseUserProvider.when (loading → spinner, null → SignInPage, user → app shell)
+	•	Guest modes:
+	•	signed-out user → no saved-test persistence (must sign in as guest/anon to save)
+	•	anonymous Firebase user → local bucket scoreSets:guest:{anonUid}
+	•	Signed-in (non-anon) user data: Firestore users/{uid}/scoreSets
+	•	Migration: on auth transition (anon → non-anon or uid change), with in-flight guard
+
+⸻
+
+Assets (what we must protect)
+	1.	User score sets (saved results)
+	2.	Default profile settings (age/sex/standard)
+	3.	Account boundaries (A must never get B’s data)
+	4.	Data durability (no silent loss during migration/offline)
+	5.	App stability (no crashes due to init/order/races)
+
+⸻
+
+Primary trust boundaries / identity assumptions
+	•	“Account identity” is defined by Firebase uid for non-anonymous users.
+	•	Anonymous sessions are treated as “guest but per anon user id.”
+	•	Signed-out sessions do not persist saved tests; guest data is scoped to the anonymous uid.
+
+Status summary (current implementation)
+	•	FM-1: Addressed by disabling signed-out persistence + guest scoped to anon uid (legacy guest bucket may exist).
+	•	FM-2: Addressed by auth transition listener + in-flight guard.
+	•	FM-3: Addressed with marker + server verification; pending flag prevents clears when offline.
+	•	FM-4: Addressed for new sets via unique id; legacy ids could still collide.
+	•	FM-5: Addressed; auth actions are null-safe.
+	•	FM-6: Addressed; AuthGate uses stream state and authUserProvider fallback.
+	•	FM-7: Addressed for anonymous upgrade via linkWithCredential; conflict UX pending.
+	•	FM-8: Partial; repo invalidation + saved list keyed by uid; verify other user-scoped providers.
+	•	FM-9: Rules file updated; deploy still required.
+
+⸻
+
+Failure modes (what can go wrong)
+
+FM-1: Cross-account data leakage via signed-out guest bucket
+
+Symptom: User B sees/migrates score sets created by signed-out usage that were intended for User A, or vice versa.
+
+Cause: Legacy signed-out bucket (scoreSets:guest) could be claimed by the first account that signs in on this device. New signed-out saves are blocked.
+
+Impact: privacy breach; incorrect data association.
+
+Repro scenario:
+	1.	Fresh install → stay signed out → create saved sets (go to scoreSets:guest)
+	2.	Sign in as A → migration uploads sets to A
+	3.	Sign out → create more sets (again scoreSets:guest)
+	4.	Sign in as B → migration uploads those sets to B
+
+Mitigation (implemented):
+	•	Signed-out persistence removed; saving requires anonymous sign-in.
+	•	Guest data scoped to anonymous uid; legacy guest bucket guarded by owner uid.
+
+⸻
+
+FM-2: Migration race / multiple triggers
+
+Symptom: Migration runs multiple times, writes duplicates, partial clears, or erratic behavior.
+
+Cause: Previously triggered inside AuthGate build; now handled on auth transition with an in-flight guard.
+
+Impact: duplicate Firestore writes, rate limiting, inconsistent local state.
+
+Repro scenario:
+	•	Sign in; then quickly navigate, hot restart, rotate device, or trigger rebuilds while migration runs.
+
+Mitigation (implemented):
+	•	Once-per-uid guard + in-memory lock.
+	•	Migration triggers in auth transition listener, not inside build.
+
+⸻
+
+FM-3: Partial migration + local clear = data loss
+
+Symptom: Some sets appear in Firestore but some disappear entirely.
+
+Cause: Batch commits are not server-confirmed; local data should only clear after server confirms a marker write.
+
+Impact: silent data loss.
+
+Repro scenario:
+	•	Start migration with 20 sets; toggle airplane mode mid-migration; app clears local anyway.
+
+Mitigation (implemented):
+	•	Marker + server re-read confirmation before clearing local.
+	•	Pending status stored when verification fails; retry later.
+
+⸻
+
+FM-4: Firestore doc id collisions / overwrites
+
+Symptom: Older saved set disappears after saving a new one; duplicates collapse into one.
+
+Cause: docId = ScoreSet.id can collide if ids are reused; legacy ids may already exist.
+
+Impact: silent overwrite.
+
+Mitigation (implemented for new data):
+	•	New ScoreSet ids include a random suffix to reduce collisions.
+	•	Legacy ids may still collide; consider Firestore auto-id for full isolation.
+
+⸻
+
+FM-5: authActionsProvider null-assert crash
+
+Symptom: “Continue as guest” or sign-out crashes in tests or early init.
+
+Cause: auth! used while firebaseAuthProvider can return null (fixed).
+
+Mitigation (implemented):
+	•	Auth actions return controlled errors when auth is null.
+
+⸻
+
+FM-6: Startup flicker / incorrect UI due to authStateProvider reading .asData
+
+Symptom: App shows SignInPage briefly even when user is signed in.
+
+Cause: Previously used .asData while loading; now AuthGate gates on stream state.
+
+Mitigation (implemented):
+	•	AuthGate uses firebaseUserProvider.when and authUserProvider fallback.
+
+⸻
+
+FM-7: Anonymous upgrade not linked (account continuity issues)
+
+Symptom: User “upgrades” but ends up with a new account; cross-device doesn’t show data unless migration succeeded.
+
+Cause: Copy/migrate approach instead of linkWithCredential (fixed for register flow).
+
+Mitigation (implemented):
+	•	Register flow links credentials when current user is anonymous.
+	•	Conflict handling (credential already in use) still needs UX decision.
+
+⸻
+
+FM-8: Account switching & stale providers
+
+Symptom: User B briefly sees User A’s data/settings after sign out/in, or listeners remain on wrong path.
+
+Cause: user-scoped providers not invalidated on uid change (partially addressed).
+
+Mitigation (partial):
+	•	Invalidate repository and clear editing state on auth transition.
+	•	Saved Sets list keyed by user id; verify other user-scoped providers.
+
+⸻
+
+FM-9: Security rules misconfig = cross-user reads/writes
+
+Symptom: User can read/write other users’ score sets.
+
+Cause: Firestore rules too permissive (rules file updated, not yet deployed).
+
+Mitigation (partial):
+	•	Rules file restricts access by uid; deploy still required.
+	•	Schema validation still pending.
+
+⸻
+
+Plan to address issues (prioritized, mapped to FM-1..FM-9)
+
+Phase 0 — Prereqs and stability baseline (Implemented)
+	•	Confirm Firebase config and providers (Email/Password + Anonymous enabled).
+	•	Verify app initializes Firebase before any auth access.
+	•	Acceptance: authStateChanges emits without crashes; no auth init exceptions.
+
+Phase 1 — Stop cross-account leakage (FM-1, FM-8) (Implemented)
+	•	Remove signed-out persistence for saves; require anonymous sign-in before saving.
+	•	If signed-out saving must remain, replace scoreSets:guest with device- or anon-scoped key (not used).
+	•	Key user-scoped providers by uid and invalidate on auth transitions.
+	•	Acceptance: FM-1 repro fails; user A’s data never appears for user B or guest.
+
+Phase 2 — Migration reliability + idempotency (FM-2, FM-3, FM-4) (Partial)
+	•	Add once-per-uid guard and in-memory lock; trigger migration only on auth transition.
+	•	Two-phase migration: write/batch → verify commit → clear local; keep local cache until verified.
+	•	Enforce unique ScoreSet ids (UUIDv4) or use Firestore auto-id + store local id field.
+	•	Acceptance: no duplicates on repeated migrations; no data loss when offline mid-migration.
+
+Phase 3 — Account continuity (FM-7) (Partial)
+	•	Use linkWithCredential for anonymous upgrade; handle existing-account conflicts explicitly.
+	•	Acceptance: anon upgrades keep same uid; data appears on other devices without manual migration.
+
+Phase 4 — Auth UI safety + routing correctness (FM-5, FM-6) (Implemented)
+	•	Make auth actions nullable or gate UI while auth is null/uninitialized.
+	•	Route only after Firebase init + stream is ready (use when/loading); avoid .asData null reads.
+	•	Acceptance: no sign-in flicker; no auth null-assert crashes.
+
+Phase 5 — Security rules hardening (FM-9) (Pending deploy)
+	•	Restrict access to request.auth.uid == userId; validate schema and size constraints.
+	•	Acceptance: cross-user reads/writes denied; invalid docs rejected.
+
+Phase 6 — Observability and recovery (supports FM-2/3/7) (Planned)
+	•	Log migration start/end/failure with uid + bucket; store last migration status locally.
+	•	Add retry hooks when connectivity returns.
+	•	Acceptance: failures are diagnosable; migration resumes without manual intervention.
+
+⸻
+
+Test plan (manual + automated scenarios)
+
+A) Identity and routing
+	1.	Fresh install, no auth → ensure SignInPage stable (no flicker loops).
+	2.	Signed in user cold start → never show SignInPage (or only loading).
+	3.	Sign out → ensure all signed-in scoped providers reset.
+
+B) Guest buckets and migration correctness
+	4.	Signed-out create sets → should be blocked or prompt to sign in as guest.
+	5.	Anonymous create sets → verify storage key (guest:{anonUid}).
+	6.	Guest→email register (link) triggers migration once:
+	•	verify uid unchanged
+	•	verify Firestore contains all sets
+	•	verify local keys cleared only after success
+
+C) Cross-account leakage regression test
+	7.	Legacy signed-out bucket (from older build) + sign in as A → migrate.
+	8.	Sign out; sign in as B → ensure B DOES NOT get A’s legacy guest bucket.
+
+D) Migration durability tests
+	9.	Start migration, enable airplane mode halfway → ensure no local clear and migration resumes/retries.
+	10.	Force app kill during migration → restart and ensure idempotent behavior.
+
+E) Collision / idempotency
+	11.	Create two sets with same id (simulate) → verify your chosen strategy prevents overwrite or logs loudly.
+	12.	Re-run migration on same uid → verify it’s a no-op (idempotent) and doesn’t duplicate.
+
+F) Multi-device
+	13.	Sign in on device A, create sets; sign in on device B → verify sets appear via Firestore.
+	14.	Anonymous on device A then link; sign in on device B → verify continuity (if linking is implemented).
+
+⸻
+
+Recommended hardening roadmap (minimal changes first)
+
+Phase 1 (fast safety wins) (Done)
+	•	Remove signed-out persistence (force anonymous guest before saving)
+	•	Add migration lock + once-per-uid guard
+	•	Remove auth! from authActionsProvider (make safe)
+	•	Gate routing on init + stream state (when)
+
+Phase 2 (correct identity & durability) (Partial)
+	•	Replace guest upgrade migration with linkWithCredential (done)
+	•	Two-phase migration or keep local as cache until confirmed (done)
+	•	Batch writes + retry + progress flag (batch + pending done; automatic retry pending)
+
+Phase 3 (polish) (Partial)
+	•	Provider invalidation on auth transitions (partial)
+	•	Strong Firestore rules + schema validation (rules file done; deploy + schema pending)
+	•	Telemetry for migration failures (pending)
+
+⸻
+
+If you want, I can also rewrite your existing “Authentication (Current Implementation)” doc by adding:
+	•	a Known Issues section (FM-1..FM-9)
+	•	a Test Matrix
+	•	a Hardening Plan
+so your repo documentation stays the single source of truth.

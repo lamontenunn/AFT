@@ -1,24 +1,30 @@
 # Authentication (Current Implementation)
 
 This document explains how authentication works in the current codebase.
-It is intended for internal developers and AI agents who need to understand the control-flow, providers, and the persistence implications (guest buckets + migration).
+It is intended for internal developers and AI agents who need to understand the control-flow, providers, and persistence behavior (guest buckets + migration).
 
-> **Scope:** This describes what exists today. It is not a “perfect” auth architecture; it documents the current behavior so changes can be made safely.
+> Scope: This describes what exists today. It is not a perfect auth architecture; it documents the current behavior so changes can be made safely.
 
 ---
 
 ## TL;DR
 
-- Auth is backed by **FirebaseAuth**.
-- The **source of truth** is `FirebaseAuth.authStateChanges()`.
-- Routing is gated by `AuthGate`:
-  - user == `null` → `SignInPage`
-  - user != `null` → `AftScaffold(child: FeatureHomeScreen())`
-- “Guest” mode is supported via **Firebase anonymous sign-in**.
-- Saved data uses a bucket key computed from auth state:
-  - anonymous or null user → `guest`
-  - signed-in (non-anonymous) user → `uid`
-- When a user transitions from guest → non-anonymous, guest saved sets are migrated once.
+- Auth is backed by FirebaseAuth.
+- The source of truth is FirebaseAuth.authStateChanges().
+- Routing is gated by AuthGate across app routes:
+  - user == null -> SignInPage
+  - user != null -> app shell
+- Auth side effects live in authSideEffectsProvider:
+  - resets user-scoped providers on auth changes
+  - tracks anonymous uid for migration
+  - migrates guest data when a non-anonymous user signs in
+- Sign-in methods: email/password and anonymous (guest).
+- Saved data routing:
+  - signed-out user -> local bucket scoreSets:signed-out
+  - anonymous user -> local bucket scoreSets:guest:{anonUid}
+  - signed-in (non-anonymous) user -> Firestore users/{uid}/scoreSets
+- Default profile settings are stored locally per user scope and sync to Firestore for signed-in users.
+- Guest migration merges legacy local buckets and clears them only after a verified server write.
 
 ---
 
@@ -26,22 +32,31 @@ It is intended for internal developers and AI agents who need to understand the 
 
 ### UI / flow
 
-- `lib/features/auth/auth_gate.dart`
-- `lib/features/auth/sign_in_page.dart`
+- lib/features/auth/auth_gate.dart
+- lib/features/auth/sign_in_page.dart
 
 ### Providers / state
 
-- `lib/features/auth/providers.dart`
-- `lib/features/auth/auth_state.dart`
+- lib/features/auth/providers.dart
+- lib/features/auth/auth_state.dart
+
+### Auth side effects
+
+- lib/features/auth/auth_side_effects.dart
+- lib/app.dart (watches authSideEffectsProvider)
 
 ### Guest migration
 
-- `lib/features/saves/guest_migration.dart`
+- lib/features/saves/guest_migration.dart
+
+### Settings / profile sync
+
+- lib/state/settings_state.dart
 
 ### Firebase init
 
-- `lib/main.dart`
-- `lib/firebase_options.dart`
+- lib/main.dart
+- lib/firebase_options.dart
 
 ---
 
@@ -51,20 +66,21 @@ It is intended for internal developers and AI agents who need to understand the 
 main.dart
   └─ Firebase.initializeApp()
   └─ ProviderScope
-       └─ AppRouter -> AuthGate
-             └─ firebaseUserProvider (authStateChanges)
-                  ├─ null  -> SignInPage
-                  └─ User  -> AftScaffold(FeatureHomeScreen)
-                           └─ if non-anonymous -> GuestMigration.maybeMigrateGuestTo(uid)
+       └─ App
+            ├─ authSideEffectsProvider (listens to auth changes)
+            └─ AppRouter -> AuthGate(child: route)
+                 └─ firebaseUserProvider (authStateChanges)
+                      ├─ null  -> SignInPage
+                      └─ User  -> App shell
 ```
 
 ---
 
 ## Providers (what they do and why)
 
-All auth-related providers live in `lib/features/auth/providers.dart`.
+All auth-related providers live in lib/features/auth/providers.dart.
 
-### `firebaseAuthProvider`
+### firebaseAuthProvider
 
 ```dart
 final firebaseAuthProvider = Provider<FirebaseAuth?>((ref) {
@@ -75,14 +91,10 @@ final firebaseAuthProvider = Provider<FirebaseAuth?>((ref) {
 
 Purpose:
 
-- Exposes `FirebaseAuth.instance`.
-- Returns `null` when Firebase is not initialized (notably in tests), which prevents accidental Firebase calls.
+- Exposes FirebaseAuth.instance.
+- Returns null when Firebase is not initialized (notably in tests), which prevents accidental Firebase calls.
 
-Implication:
-
-- Many auth flows must handle `auth == null` gracefully.
-
-### `firebaseUserProvider`
+### firebaseUserProvider
 
 ```dart
 final firebaseUserProvider = StreamProvider<User?>((ref) {
@@ -94,191 +106,238 @@ final firebaseUserProvider = StreamProvider<User?>((ref) {
 
 Purpose:
 
-- Wraps `authStateChanges()` as a Riverpod `StreamProvider`.
-- If Firebase isn’t initialized, the app behaves as signed out.
+- Wraps authStateChanges() as a Riverpod StreamProvider.
+- If Firebase is not initialized, the app behaves as signed out.
 
-### `authStateProvider`
-
-Maps the `User?` into a simple immutable `AuthState` for UI consumption.
-
-Notes:
-
-- This provider is **not async**; it reads the current value from `firebaseUserProvider.asData?.value`.
-- This is convenient for UI that doesn’t want to do `.when(...)`.
-
-### `effectiveUserIdProvider`
+### authUserProvider
 
 ```dart
-final effectiveUserIdProvider = Provider<String>((ref) {
+final authUserProvider = Provider<User?>((ref) {
   final asyncUser = ref.watch(firebaseUserProvider);
-  final user = asyncUser.asData?.value;
-  if (user == null || user.isAnonymous) return 'guest';
-  return user.uid;
-});
-```
-
-Purpose:
-
-- Defines the “bucket” identifier used by persistence.
-
-Behavior:
-
-- `null user` → `guest`
-- `anonymous user` → `guest`
-- `non-anonymous user` → `uid`
-
-This means anonymous sessions share the same saved-set bucket as “guest”.
-
-### `authActionsProvider`
-
-```dart
-final authActionsProvider = Provider<_AuthActions>((ref) {
-  final auth = ref.read(firebaseAuthProvider);
-  return _AuthActions(
-    signInAnonymously: () => auth!.signInAnonymously(),
-    signOut: () => auth!.signOut(),
+  final auth = ref.watch(firebaseAuthProvider);
+  return asyncUser.maybeWhen(
+    data: (user) => user,
+    orElse: () => auth?.currentUser,
   );
 });
 ```
 
 Purpose:
 
-- Thin wrapper for auth actions.
-- Note that it uses `auth!` (non-null assertion). UI must only call these actions when FirebaseAuth exists.
+- Provides a non-async User? with a currentUser fallback while the stream is loading.
+
+### authStateProvider
+
+Maps the User? into a simple immutable AuthState for UI consumption.
+
+Notes:
+
+- Uses authUserProvider to avoid flicker during startup.
+
+### isGuestUserProvider
+
+True when the current user is anonymous.
+
+### effectiveUserIdProvider
+
+```dart
+final effectiveUserIdProvider = Provider<String>((ref) {
+  final user = ref.watch(authUserProvider);
+  if (user == null) return 'signed-out';
+  if (user.isAnonymous) return 'guest:${user.uid}';
+  return user.uid;
+});
+```
+
+Purpose:
+
+- Defines the user-scoped bucket id used by persistence.
+
+### authActionsProvider
+
+```dart
+final authActionsProvider = Provider<_AuthActions>((ref) {
+  final auth = ref.read(firebaseAuthProvider);
+  return _AuthActions(
+    signInAnonymously: () {
+      if (auth == null) {
+        return Future.error(StateError('Auth not initialized'));
+      }
+      return auth.signInAnonymously();
+    },
+    signOut: () {
+      if (auth == null) {
+        return Future.error(StateError('Auth not initialized'));
+      }
+      return auth.signOut();
+    },
+  );
+});
+```
+
+Purpose:
+
+- Thin wrapper for auth actions with a safe null guard.
+- Email/password flows use firebaseAuthProvider directly inside SignInPage.
 
 ---
 
 ## AuthGate behavior
 
-File: `lib/features/auth/auth_gate.dart`
+File: lib/features/auth/auth_gate.dart
 
-AuthGate reads `firebaseUserProvider` and renders:
+AuthGate reads firebaseUserProvider and renders:
 
-- Loading state → `CircularProgressIndicator`
-- Error state → simple error scaffold
+- Loading state -> CircularProgressIndicator
+- Error state -> simple error scaffold
 - Data:
-  - `user == null` → `SignInPage`
-  - else → `AftScaffold(showHeader: true, child: FeatureHomeScreen())`
+  - user == null -> SignInPage
+  - else -> render the provided child
 
-### Guest migration trigger
+AuthGate does not trigger migration; side effects are centralized in authSideEffectsProvider.
 
-When the user is **non-anonymous**, AuthGate triggers:
+---
 
-```dart
-Future.microtask(() => GuestMigration.maybeMigrateGuestTo(user.uid));
-```
+## Auth side effects (migration + invalidation)
 
-Notes:
+File: lib/features/auth/auth_side_effects.dart
 
-- “Fire and forget” call.
-- The migration is guarded by a SharedPreferences flag, so it should only happen once per uid.
+This provider is watched in App, and listens to firebaseUserProvider:
+
+- On auth uid change:
+  - clears the current editing set
+  - invalidates aftRepositoryProvider and settingsProvider
+- If the user is anonymous:
+  - trackGuestUser(uid)
+- If the user becomes non-anonymous (or the uid changes):
+  - maybeMigrateGuestTo(uid)
 
 ---
 
 ## Sign-in UI behavior
 
-File: `lib/features/auth/sign_in_page.dart`
+File: lib/features/auth/sign_in_page.dart
 
 Current sign-in methods:
 
-1. **Phone auth (SMS)**
+1. Email + password
+   - Sign in with email/password.
+   - Create account uses createUserWithEmailAndPassword.
+   - If the current user is anonymous, create account uses linkWithCredential to keep the same uid.
+   - Password reset uses sendPasswordResetEmail.
 
-   - Normalizes phone numbers to E.164 (assumes US +1 for 10-digit input).
-   - `verifyPhoneNumber(...)` sends code.
-   - On Android, may auto-complete (`verificationCompleted`).
-   - On verify success → `signInWithCredential`.
-
-2. **Continue as Guest**
-   - Calls `FirebaseAuth.signInAnonymously()`.
+2. Continue as Guest
+   - Calls FirebaseAuth.signInAnonymously().
+   - Tracks anon uid with GuestMigration.trackGuestUser so migration can find the bucket later.
 
 Navigation:
 
-- The page attempts to `Navigator.pop()` after successful sign-in.
-- However, note that `AuthGate` will typically handle routing by rebuilding to the signed-in shell once `authStateChanges()` emits a user.
+- The page attempts to Navigator.pop() after successful sign-in.
+- AuthGate will rebuild to the signed-in shell when authStateChanges() emits a user.
 
 ---
 
 ## Persistence + guest buckets
 
-Guest migration lives in `lib/features/saves/guest_migration.dart`.
+Local score sets are stored by LocalAftRepository under the key:
 
-Keys:
+- scoreSets:{userId}
 
-- Guest bucket: `scoreSets:guest`
-- User bucket: `scoreSets:{uid}`
-- Migration flag: `guestMigrated:{uid}`
+where userId is the value from effectiveUserIdProvider.
 
-Algorithm (`maybeMigrateGuestTo(uid)`):
+Buckets in use:
 
-1. If `guestMigrated:{uid}` is true → stop.
-2. Read guest bucket; if empty:
-   - set `guestMigrated:{uid}` true
-   - stop
-3. Decode guest sets and existing user sets.
-4. Merge lists and sort `createdAt` descending.
-5. Save merged list to user bucket.
-6. Clear guest bucket.
-7. Set migration flag.
+- signed-out -> scoreSets:signed-out (current)
+- anonymous -> scoreSets:guest:{anonUid}
+- legacy signed-out -> scoreSets:guest (migration only)
+- legacy local signed-in -> scoreSets:{uid} (migration only)
 
-Important behavior:
+Firestore:
 
-- Migration is only triggered for **non-anonymous** users.
-- Anonymous users are treated as `guest` by `effectiveUserIdProvider`.
+- User data lives in users/{uid}/scoreSets (document id = ScoreSet.id).
+- Default profile settings live in users/{uid} under defaultProfile.
+
+---
+
+## Guest migration details
+
+Guest migration lives in lib/features/saves/guest_migration.dart.
+
+Algorithm (maybeMigrateGuestTo(uid)):
+
+1. Read legacy guest bucket (scoreSets:guest), last anon guest bucket, and legacy local user bucket.
+2. Prevent cross-account migration of the legacy signed-out bucket using scoreSets:guestOwnerUid.
+3. Merge sets by id and write to Firestore users/{uid}/scoreSets using batched writes.
+4. Write a migration marker (users/{uid}.migration) and verify it against the server.
+5. If verified, clear local buckets; otherwise mark migration pending and keep local data.
+
+Notes:
+
+- Uses an in-flight lock to prevent concurrent migrations for the same uid.
+- Uses migrationPending keys to retry later when offline or on failure.
+
+---
+
+## Default profile settings sync
+
+SettingsController (lib/state/settings_state.dart) manages default profile settings.
+
+Behavior:
+
+- Local profile data is stored in SharedPreferences, scoped per user:
+  - signed-out
+  - guest:{anonUid}
+  - uid
+- On auth change, the controller loads the scoped profile.
+- For signed-in users, it syncs with Firestore users/{uid}.
+- updatedAt is used for last-write-wins resolution.
 
 ---
 
 ## Common flows (step-by-step)
 
-### Flow A: Fresh install → Phone sign-in
+### Flow A: Fresh install -> Email sign-in
 
 1. App starts.
-2. `firebaseUserProvider` emits `null`.
-3. `AuthGate` shows `SignInPage`.
-4. Phone verification succeeds → Firebase signs in.
-5. `firebaseUserProvider` emits `User(uid, isAnonymous=false)`.
-6. `AuthGate`:
-   - triggers guest migration (usually no-op)
-   - shows `AftScaffold(...FeatureHomeScreen)`.
+2. firebaseUserProvider emits null.
+3. AuthGate shows SignInPage.
+4. Email sign-in succeeds.
+5. firebaseUserProvider emits User(uid, isAnonymous=false).
+6. authSideEffectsProvider invalidates user-scoped providers and triggers migration.
+7. AuthGate shows the app shell.
 
-### Flow B: Fresh install → Continue as Guest
+### Flow B: Fresh install -> Continue as Guest
 
 1. App starts.
-2. User selects “Continue as Guest”.
+2. User selects Continue as Guest.
 3. Firebase signs in anonymously.
-4. `firebaseUserProvider` emits `User(isAnonymous=true)`.
-5. `AuthGate` shows `AftScaffold` (no migration).
-6. Persistence uses effective user id = `guest`.
+4. firebaseUserProvider emits User(isAnonymous=true).
+5. authSideEffectsProvider tracks anon uid.
+6. AuthGate shows the app shell; persistence uses scoreSets:guest:{anonUid}.
 
-### Flow C: Guest (anonymous) → Phone sign-in later
+### Flow C: Guest (anonymous) -> Email sign-in later
 
-1. User uses app as guest; saved sets exist in guest bucket.
-2. User phone signs in.
-3. `firebaseUserProvider` emits non-anonymous user.
-4. `AuthGate` triggers migration:
-   - `scoreSets:guest` merged into `scoreSets:{uid}`
-   - `guestMigrated:{uid}` set
+1. User uses app as guest; saved sets exist in guest:{anonUid}.
+2. User registers while anonymous; credentials are linked (uid preserved).
+3. authSideEffectsProvider sees anon -> non-anon and migrates guest data into Firestore.
 
 ---
 
 ## Troubleshooting
 
-### “Auth not initialized”
+### "Auth not initialized"
 
-The SignInPage shows this error when `firebaseAuthProvider` returns null.
+The SignInPage shows this error when firebaseAuthProvider returns null.
 
 Typical causes:
 
-- Firebase initialization didn’t run.
-- You’re running a widget test without Firebase.
+- Firebase initialization did not run.
+- Running a widget test without Firebase.
 
-### Phone auth issues
+### Email auth issues
 
-- On Web, Firebase may present a reCAPTCHA.
-- On Android, SMS auto-retrieval may complete without manual code entry.
-
-### Emulator usage
-
-If you’re developing auth flows, it can be useful to point to the Auth emulator in debug builds.
+- email-already-in-use means the user should use the Sign in flow instead of Create account.
+- wrong-password or user-not-found indicates invalid credentials.
 
 ---
 
@@ -287,15 +346,16 @@ If you’re developing auth flows, it can be useful to point to the Auth emulato
 Common changes you might make:
 
 1. Add new sign-in methods (Google/Apple/email)
+   - Implement in SignInPage (or a new auth UI).
+   - Keep AuthGate routing based on firebaseUserProvider.
 
-   - Implement in `SignInPage` (or a new auth UI)
-   - Ensure AuthGate still routes based on `firebaseUserProvider`.
+2. Change guest semantics
+   - Update effectiveUserIdProvider.
+   - Review guest migration keys and logic.
 
-2. Change “guest” semantics
+3. Change profile sync
+   - Update SettingsController sync logic in settings_state.dart.
 
-   - Update `effectiveUserIdProvider`.
-   - Review guest migration behavior and keys.
-
-3. Route differently after sign-in
-   - Currently AuthGate always routes to `FeatureHomeScreen` inside `AftScaffold`.
-   - If you add onboarding, this is where you would branch.
+4. Route differently after sign-in
+   - AuthGate renders the provided child, and AppRouter wires it per route.
+   - If you add onboarding, branch here.
