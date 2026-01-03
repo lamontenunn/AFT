@@ -6,31 +6,54 @@ import 'package:aft_firebase_app/features/aft/state/aft_inputs.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart'
     show AftComputed;
+import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/features/proctor/state/proctor_session.dart';
 import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
 import 'package:aft_firebase_app/features/proctor/state/proctor_inputs.dart';
 
 class ProctorSessionNotifier extends Notifier<ProctorSessionState> {
   static const _kPrefsKey = 'proctor_session_v1';
+  String? _activeScope;
+  int _loadToken = 0;
 
   @override
   ProctorSessionState build() {
+    final scope = ref.watch(effectiveUserIdProvider);
+    if (_activeScope != scope) {
+      _activeScope = scope;
+      _loadToken++;
+    }
+    final token = _loadToken;
     // Start empty; async load will replace.
-    _load();
+    _load(scope, token);
     return ProctorSessionState.initial();
   }
 
-  Future<void> _load() async {
+  String _scopedKey(String scope) => '$_kPrefsKey:$scope';
+
+  Future<void> _load(String scope, int token) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_kPrefsKey);
+    final scopedKey = _scopedKey(scope);
+    var raw = prefs.getString(scopedKey);
+    if (raw == null || raw.isEmpty) {
+      final legacy = prefs.getString(_kPrefsKey);
+      if (legacy != null && legacy.isNotEmpty) {
+        raw = legacy;
+        await prefs.setString(scopedKey, legacy);
+        await prefs.remove(_kPrefsKey);
+      }
+    }
     if (raw == null || raw.isEmpty) return;
     final loaded = ProctorSessionState.fromJsonString(raw);
+    if (token != _loadToken || _activeScope != scope) return;
     state = loaded;
   }
 
   Future<void> _persist(ProctorSessionState next) async {
+    final scope = _activeScope;
+    if (scope == null || scope.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPrefsKey, next.toJsonString());
+    await prefs.setString(_scopedKey(scope), next.toJsonString());
   }
 
   Future<void> addParticipant(ProctorParticipant p) async {
