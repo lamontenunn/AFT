@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
+import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
@@ -12,143 +12,189 @@ class SignInPage extends ConsumerStatefulWidget {
 }
 
 class _SignInPageState extends ConsumerState<SignInPage> {
-  final _phoneController = TextEditingController();
-  final _codeController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _sending = false;
-  bool _verifying = false;
-  bool _codeSent = false;
-  String? _verificationId;
+  bool _isRegistering = false;
+  bool _showPassword = false;
+  bool _showConfirm = false;
+  bool _submitting = false;
+  bool _resetting = false;
   String? _error;
+  String? _info;
 
-  @override
-  void dispose() {
-    _phoneController.dispose();
-    _codeController.dispose();
-    super.dispose();
+  void _setStateIfMounted(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
   }
 
-  String? _normalizePhone(String input) {
-    // Accept E.164 or US local numbers. Strip formatting, add +1 if needed.
-    final raw = input.replaceAll(RegExp(r'[^0-9+]'), '');
-    if (raw.startsWith('+')) return raw; // already E.164
-    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length == 10) return '+1$digits';
-    if (digits.length == 11 && digits.startsWith('1')) return '+1${digits.substring(1)}';
-    return null; // invalid
+  String _friendlyAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'user-not-found':
+        return 'No user found for that email.';
+      case 'wrong-password':
+        return 'Incorrect password.';
+      case 'email-already-in-use':
+        return 'An account already exists for that email.';
+      case 'credential-already-in-use':
+        return 'That email is already linked to another account.';
+      case 'weak-password':
+        return 'Password must be at least 6 characters.';
+      case 'operation-not-allowed':
+        return 'Email/password sign-in is not enabled for this Firebase project.';
+      case 'too-many-requests':
+        return 'Too many requests. Try again later.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      default:
+        return e.message ?? 'Authentication failed.';
+    }
   }
 
-  Future<void> _sendCode() async {
-    setState(() {
-      _sending = true;
-      _error = null;
-    });
+  String? _validateEmail(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return 'Enter your email';
+    if (!text.contains('@') || !text.contains('.')) {
+      return 'Enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    final text = value ?? '';
+    if (text.isEmpty) return 'Enter your password';
+    if (text.length < 6) return 'Password must be at least 6 characters';
+    return null;
+  }
+
+  String? _validateConfirm(String? value) {
+    if (!_isRegistering) return null;
+    if (value == null || value.isEmpty) return 'Confirm your password';
+    if (value != _passwordController.text) return 'Passwords do not match';
+    return null;
+  }
+
+  Future<void> _submit() async {
     final auth = ref.read(firebaseAuthProvider);
     if (auth == null) {
-      setState(() {
-        _error = 'Auth not initialized';
-        _sending = false;
-      });
+      _setStateIfMounted(() => _error = 'Auth not initialized');
       return;
     }
+    final valid = _formKey.currentState?.validate() ?? false;
+    if (!valid) return;
+
+    _setStateIfMounted(() {
+      _submitting = true;
+      _error = null;
+      _info = null;
+    });
+    FocusScope.of(context).unfocus();
     try {
-      final phone = _normalizePhone(_phoneController.text.trim());
-      if (phone == null) {
-        setState(() {
-          _error = 'Enter a valid 10-digit US number or E.164 (+...)';
-          _sending = false;
-        });
-        return;
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      final currentUser = auth.currentUser;
+      if (_isRegistering) {
+        if (currentUser != null && currentUser.isAnonymous) {
+          final credential = EmailAuthProvider.credential(
+            email: email,
+            password: password,
+          );
+          await currentUser.linkWithCredential(credential);
+        } else {
+          await auth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        }
+      } else {
+        await auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
       }
-      await auth.verifyPhoneNumber(
-        phoneNumber: phone,
-        timeout: const Duration(seconds: 60),
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          // On Android, may auto-complete. Perform sign-in for a seamless flow.
-          try {
-            await auth.signInWithCredential(credential);
-            if (mounted && Navigator.of(context).canPop()) {
-              Navigator.of(context).pop(); // back to previous screen
-            }
-          } catch (e) {
-            setState(() => _error = 'Auto-verification failed: $e');
-          }
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          setState(() => _error = e.message ?? 'Verification failed');
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          setState(() {
-            _verificationId = verificationId;
-            _codeSent = true;
-          });
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          setState(() {
-            _verificationId = verificationId;
-          });
-        },
-      );
-    } catch (e) {
-      setState(() => _error = 'Failed to send code: $e');
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Future<void> _verifyCode() async {
-    if (_verificationId == null) {
-      setState(() => _error = 'No verification in progress. Send code first.');
-      return;
-    }
-    setState(() {
-      _verifying = true;
-      _error = null;
-    });
-    final auth = ref.read(firebaseAuthProvider);
-    if (auth == null) {
-      setState(() {
-        _error = 'Auth not initialized';
-        _verifying = false;
-      });
-      return;
-    }
-    try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: _codeController.text.trim(),
-      );
-      await auth.signInWithCredential(credential);
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Invalid code');
+      _setStateIfMounted(() => _error = _friendlyAuthError(e));
     } catch (e) {
-      setState(() => _error = 'Failed to verify code: $e');
+      _setStateIfMounted(() => _error = 'Authentication failed: $e');
     } finally {
-      if (mounted) setState(() => _verifying = false);
+      _setStateIfMounted(() => _submitting = false);
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final auth = ref.read(firebaseAuthProvider);
+    if (auth == null) {
+      _setStateIfMounted(() => _error = 'Auth not initialized');
+      return;
+    }
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _setStateIfMounted(() => _error = 'Enter your email to reset password');
+      return;
+    }
+
+    _setStateIfMounted(() {
+      _resetting = true;
+      _error = null;
+      _info = null;
+    });
+    FocusScope.of(context).unfocus();
+    try {
+      await auth.sendPasswordResetEmail(email: email);
+      _setStateIfMounted(
+        () => _info = 'Password reset email sent to $email',
+      );
+    } on FirebaseAuthException catch (e) {
+      _setStateIfMounted(() => _error = _friendlyAuthError(e));
+    } catch (e) {
+      _setStateIfMounted(() => _error = 'Failed to send reset email: $e');
+    } finally {
+      _setStateIfMounted(() => _resetting = false);
     }
   }
 
   Future<void> _signInAnonymously() async {
-    setState(() => _error = null);
+    _setStateIfMounted(() {
+      _error = null;
+      _info = null;
+    });
     try {
-      await ref.read(authActionsProvider).signInAnonymously();
+      final cred = await ref.read(authActionsProvider).signInAnonymously();
+      final user = cred.user;
+      if (user != null) {
+        await ref.read(guestMigrationProvider).trackGuestUser(user.uid);
+      }
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Anonymous sign-in failed');
+      _setStateIfMounted(() => _error = _friendlyAuthError(e));
     } catch (e) {
-      setState(() => _error = 'Anonymous sign-in failed: $e');
+      _setStateIfMounted(() => _error = 'Anonymous sign-in failed: $e');
     }
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final asyncUser = ref.watch(firebaseUserProvider);
-    final isSignedIn = asyncUser.asData?.value != null;
+    final user = ref.watch(authUserProvider);
+    final isSignedIn = user != null;
+    final canSubmit = !_submitting && !_resetting;
 
     return Scaffold(
       appBar: AppBar(
@@ -158,100 +204,149 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Phone section
             Text(
-              'Phone',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              'Email',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Form(
               key: _formKey,
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone number',
-                      hintText: '555-555-0100',
+              child: AutofillGroup(
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      textCapitalization: TextCapitalization.none,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        hintText: 'name@example.com',
+                      ),
+                      validator: _validateEmail,
+                      enabled: canSubmit,
                     ),
-                    validator: (v) {
-                      final t = v?.trim() ?? '';
-                      if (t.isEmpty) return 'Enter phone number';
-                      final digits = t.replaceAll(RegExp(r'\\D'), '');
-                      final looksUs10 = digits.length == 10;
-                      final looksUs11 = digits.length == 11 && digits.startsWith('1');
-                      final looksE164 = t.startsWith('+');
-                      if (!(looksE164 || looksUs10 || looksUs11)) {
-                        return 'Enter 10-digit US number or +countrycode number';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _sending
-                              ? null
-                              : () async {
-                                  if (_formKey.currentState?.validate() ?? false) {
-                                    await _sendCode();
-                                  }
-                                },
-                          icon: _sending
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _passwordController,
+                      textInputAction:
+                          _isRegistering ? TextInputAction.next : TextInputAction.done,
+                      obscureText: !_showPassword,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      autofillHints: const [AutofillHints.password],
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        suffixIcon: IconButton(
+                          tooltip: _showPassword ? 'Hide password' : 'Show password',
+                          icon: Icon(
+                            _showPassword ? Icons.visibility_off : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() => _showPassword = !_showPassword);
+                          },
+                        ),
+                      ),
+                      validator: _validatePassword,
+                      enabled: canSubmit,
+                      onFieldSubmitted: (_) {
+                        if (!_isRegistering) _submit();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    if (_isRegistering)
+                      TextFormField(
+                        controller: _confirmController,
+                        textInputAction: TextInputAction.done,
+                        obscureText: !_showConfirm,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: InputDecoration(
+                          labelText: 'Confirm password',
+                          suffixIcon: IconButton(
+                            tooltip: _showConfirm ? 'Hide password' : 'Show password',
+                            icon: Icon(
+                              _showConfirm ? Icons.visibility_off : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() => _showConfirm = !_showConfirm);
+                            },
+                          ),
+                        ),
+                        validator: _validateConfirm,
+                        enabled: canSubmit,
+                        onFieldSubmitted: (_) => _submit(),
+                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: canSubmit ? _submit : null,
+                            icon: _submitting
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Icon(_isRegistering
+                                    ? Icons.person_add_alt_1
+                                    : Icons.login),
+                            label: Text(_isRegistering ? 'Create account' : 'Sign in'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: canSubmit
+                              ? () {
+                                  setState(() {
+                                    _isRegistering = !_isRegistering;
+                                    _error = null;
+                                    _info = null;
+                                  });
+                                }
+                              : null,
+                          child: Text(
+                            _isRegistering
+                                ? 'Have an account? Sign in'
+                                : 'Create an account',
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: (!_isRegistering && canSubmit) ? _sendPasswordReset : null,
+                          child: _resetting
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Icon(Icons.sms_outlined),
-                          label: const Text('Send code'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (_codeSent) ...[
-                    TextFormField(
-                      controller: _codeController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'SMS code',
-                        hintText: '6-digit code',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: _verifying ? null : _verifyCode,
-                            icon: _verifying
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : const Icon(Icons.verified_outlined),
-                            label: const Text('Verify'),
-                          ),
+                              : const Text('Forgot password?'),
                         ),
                       ],
                     ),
                   ],
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
             const Divider(),
             const SizedBox(height: 16),
-
-            // Guest section
             Text(
               'Guest',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             FilledButton.icon(
@@ -260,13 +355,16 @@ class _SignInPageState extends ConsumerState<SignInPage> {
               label: const Text('Continue as Guest'),
             ),
             const SizedBox(height: 16),
-
             if (_error != null)
               Text(
                 _error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
-
+            if (_info != null)
+              Text(
+                _info!,
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
+              ),
             if (isSignedIn)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
@@ -275,14 +373,6 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-
-            const SizedBox(height: 24),
-            Text(
-              kIsWeb
-                  ? 'reCAPTCHA may be shown by Firebase to verify phone sign-in on Web.'
-                  : 'On Android, SMS auto-retrieval may complete automatically.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).hintColor),
-            ),
           ],
         ),
       ),

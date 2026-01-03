@@ -1,0 +1,247 @@
+You are working on a Flutter app using Riverpod + FirebaseAuth. Create robust automated test cases that validate authentication flow + persistence behavior.
+
+Context constraints
+	•	Auth source of truth: FirebaseAuth.authStateChanges()
+	•	UI routing: AuthGate shows SignInPage when user is null, otherwise app shell.
+	•	Persistence rules:
+	•	Signed-out should not persist saved sets (repo is disabled/no-op).
+	•	Anonymous sign-in saves locally under scoreSets:guest:{anonUid}.
+	•	Non-anonymous signed-in saves go to Firestore: users/{uid}/scoreSets.
+	•	There is a guest migration module (GuestMigration) intended to move guest sets to Firestore when upgrading.
+	•	IMPORTANT: In the current code snapshot, migration exists but may not be wired (hook may be missing), and trackGuestUser(uid) exists but may not be called after anonymous sign-in. Your tests must detect these issues.
+
+What you must deliver
+	1.	A test strategy (unit vs widget vs integration) and what each tier covers.
+	2.	A list of test cases with names and Arrange/Act/Assert steps.
+	3.	Concrete Flutter test code examples (not necessarily every test fully implemented, but enough patterns for the team to implement the rest).
+	4.	Required test utilities/mocks/fakes:
+	•	mock FirebaseAuth stream + currentUser
+	•	fake shared_preferences
+	•	fake Firestore (or wrapper repo fake)
+	•	Riverpod overrides
+	5.	Clear “expected outcomes” so failing tests point to exact broken behavior.
+
+⸻
+
+What to test (detailed test blueprint)
+
+A) Unit tests — Providers & identity/persistence decisions
+
+Create unit tests for Riverpod providers and repository selection logic.
+
+A1 — firebaseAuthProvider safety
+	•	Test: firebaseAuthProvider returns null when Firebase.apps.isEmpty
+	•	Arrange: run in pure test env without Firebase init
+	•	Assert: provider returns null and downstream providers don’t crash
+
+A2 — Signed-out repo disabled
+	•	Test: aftRepositoryProvider returns DisabledAftRepository when auth user is null
+	•	Arrange: override authUserProvider/firebaseUserProvider to null
+	•	Assert:
+	•	saveScoreSet() becomes no-op or throws controlled error (depending on your design)
+	•	getScoreSets() returns empty (or controlled error)
+	•	Goal: prevent “signed-out bucket writes” anywhere.
+
+A3 — Anonymous effective user id format
+	•	Test: effectiveUserIdProvider returns guest:{uid} for anonymous
+	•	Arrange: mock User with isAnonymous=true, uid=abc
+	•	Assert: 'guest:abc'
+
+A4 — Non-anon effective user id format
+	•	Test: effectiveUserIdProvider returns uid for signed-in non-anon
+	•	Arrange: mock User with isAnonymous=false, uid=xyz
+	•	Assert: 'xyz'
+
+A5 — auth actions null-safe
+	•	Test: authActionsProvider does not crash when auth is null
+	•	Arrange: force firebaseAuthProvider null
+	•	Assert: calling actions returns controlled error, or provider is null and UI is expected to disable actions (define expected behavior)
+
+⸻
+
+B) Widget tests — Routing correctness & “no flicker” behavior
+
+Test AuthGate behavior by overriding providers.
+
+B1 — AuthGate signed-out
+	•	Test: AuthGate shows SignInPage when user is null
+	•	Arrange: override firebaseUserProvider with AsyncData(null)
+	•	Assert: SignInPage in widget tree
+
+B2 — AuthGate signed-in
+	•	Test: AuthGate shows child when user exists
+	•	Arrange: override firebaseUserProvider with AsyncData(mockUser)
+	•	Assert: child widget appears
+
+B3 — AuthGate loading
+	•	Test: AuthGate shows spinner during loading
+	•	Arrange: override firebaseUserProvider with AsyncLoading
+	•	Assert: CircularProgressIndicator shown
+
+B4 — No sign-in flicker regression
+	•	Test: Signed-in cold start should not show SignInPage between loading and user
+	•	Arrange: make stream emit loading then user quickly
+	•	Assert: never renders SignInPage (only spinner → shell)
+	•	Implementation: pump widget, then pump after stream emits user, verify SignInPage never appears.
+
+⸻
+
+C) Integration-like tests — Guest save → upgrade → migration to Firestore
+
+These tests should catch the two big gaps:
+	1.	trackGuestUser not called after anonymous sign-in
+	2.	migration not triggered on upgrade
+
+Use fakes so you don’t need real Firebase:
+	•	FakeSharedPreferences (shared_preferences testing)
+	•	FakeFirestoreRepository implementing your repository abstraction OR fake_cloud_firestore
+	•	A FakeAuth that can emit authStateChanges and supports:
+	•	anonymous user → non-anon user transition
+	•	currentUser values
+
+C1 — Anonymous guest saves locally under correct key
+	•	Arrange:
+	•	set auth state to anonymous uid anon1
+	•	ensure local repository is active for anon users (not disabled)
+	•	Act: save score set
+	•	Assert:
+	•	shared_prefs contains key scoreSets:guest:anon1 (or your exact key format)
+	•	data decodes correctly and matches saved set
+
+C2 — Upgrade triggers migration exactly once
+	•	Arrange:
+	•	start as anonymous anon1, create 3 local sets
+	•	then transition auth to non-anon uidUserA
+	•	Firestore fake initially empty
+	•	Act: “upgrade” flow (sign-in/register) triggers auth transition
+	•	Assert:
+	•	Firestore now contains those 3 sets at users/uidUserA/scoreSets
+	•	Local bucket cleared ONLY after successful migration
+	•	Migration called exactly once (use spy/hook)
+	•	This test should FAIL with current code if migration is not wired. That’s good—it highlights required implementation work.
+
+C3 — trackGuestUser is called on “Continue as Guest”
+	•	Arrange: mock the auth action returning anon uid
+	•	Act: tap Continue as Guest button
+	•	Assert: shared_prefs has lastAnonUid (or your key) set to anon uid
+	•	This test should FAIL if trackGuestUser isn’t called.
+
+C4 — Account boundary: guest data should not be migrated to wrong account
+	•	Arrange:
+	•	anonymous anon1 makes sets
+	•	upgrade to uid A → migration happens
+	•	sign out → sign in as uid B
+	•	Assert: uid B Firestore does not receive uid A’s migrated sets
+	•	(Also test “legacy bucket” behavior if it exists)
+
+C5 — Offline/partial migration durability (must not lose data)
+	•	Arrange:
+	•	anonymous has sets locally
+	•	migration begins but Firestore fake throws on commit (simulate offline/permission error)
+	•	Act: trigger migration
+	•	Assert:
+	•	local sets are NOT cleared
+	•	migration status indicates failure/pending retry
+	•	a retry later succeeds and then clears local
+	•	If your current code clears local on “commit success” without server verification, include a test that demonstrates the risk and propose fix.
+
+C6 — Idempotency: rerunning migration doesn’t duplicate
+	•	Arrange: same data; run migration twice
+	•	Assert:
+	•	Firestore set count stays the same (no duplicates)
+	•	local clearing only happens once
+
+⸻
+
+Required test tooling & how to structure overrides
+
+Suggested packages
+	•	flutter_test
+	•	riverpod_test (optional, but helpful)
+	•	mocktail or mockito
+	•	shared_preferences test API (SharedPreferences.setMockInitialValues({}))
+	•	For Firestore:
+	•	either fake_cloud_firestore
+	•	OR implement a FakeAftRepository that mimics Firestore behavior and store results in memory
+
+Riverpod overrides pattern
+	•	Build ProviderScope(overrides: [...]) to inject:
+	•	fake auth stream provider
+	•	fake repository providers
+	•	fake guest migration service spy (see below)
+
+Add a test seam for migration (highly recommended)
+
+If migration is currently a static call, ask the team to introduce:
+	•	guestMigrationProvider that exposes maybeMigrate(uid) and trackGuest(uid)
+So tests can override it with a spy and assert “called once”.
+
+⸻
+
+Output requirements (how you should format your answer)
+
+Produce:
+	1.	test/auth_providers_test.dart outline + code
+	2.	test/auth_gate_widget_test.dart outline + code
+	3.	test/auth_migration_test.dart outline + code (integration-like with fakes)
+	4.	test/fakes/ implementations:
+	•	FakeAuth (stream controller)
+	•	FakeFirestoreRepo or fake_cloud_firestore setup
+	•	GuestMigrationSpy
+	5.	Short README explaining how to run and what failures mean.
+
+⸻
+
+Plan to complete the test suite
+
+Phase 0 — Baseline setup
+	•	Verify dev dependencies: flutter_test, mocktail/mockito, fake_cloud_firestore (or custom fake repo), riverpod_test (optional).
+	•	Ensure shared_preferences uses setMockInitialValues({}) in tests.
+	•	Add a migration test seam (guestMigrationProvider) so tests can spy on calls and inject fakes.
+
+Phase 1 — Test utilities & fakes
+	•	Create `test/fakes/fake_auth.dart` with:
+	•	StreamController<User?> for authStateChanges
+	•	currentUser getter, emit helpers, and minimal FakeUser (uid/isAnonymous)
+	•	Create `test/fakes/fake_firestore_repo.dart` or use fake_cloud_firestore with FirestoreAftRepository.
+	•	Create `test/fakes/guest_migration_spy.dart` to record maybeMigrate/trackGuest calls.
+
+Phase 2 — Unit tests (providers + repository selection)
+	•	Add `test/auth_providers_test.dart`:
+	•	A1: firebaseAuthProvider returns null without Firebase init
+	•	A2: signed-out → DisabledAftRepository + no-op behavior
+	•	A3/A4: effectiveUserIdProvider formatting
+	•	A5: authActionsProvider null-safe behavior
+
+Phase 3 — Widget tests (AuthGate)
+	•	Add `test/auth_gate_widget_test.dart`:
+	•	B1/B2/B3: signed-out, signed-in, loading states
+	•	B4: no SignInPage flicker on fast loading→user transition
+
+Phase 4 — Integration-like migration tests
+	•	Add `test/auth_migration_test.dart`:
+	•	C1: anon saves to scoreSets:guest:{anonUid}
+	•	C2: anon→non-anon triggers migration once, clears local only after verified success
+	•	C3: “Continue as Guest” stores lastAnonUid
+	•	C4: account boundary test (A data not in B)
+	•	C5: offline/commit failure keeps local + sets pending; retry succeeds
+	•	C6: idempotency (no duplicates on rerun)
+
+Phase 5 — README + run instructions
+	•	Add `test/README_auth_tests.md` (or update an existing README):
+	•	How to run tests
+	•	What failures indicate (mapped to acceptance criteria)
+
+⸻
+
+Acceptance criteria
+	•	Tests fail if:
+	•	signed-out can save data
+	•	anonymous saves to wrong bucket
+	•	“Continue as Guest” doesn’t record anon uid for migration
+	•	migration is not triggered on upgrade
+	•	migration runs multiple times for same transition
+	•	offline migration clears local data
+	•	account switching shows/leaks previous account’s data
+
+⸻

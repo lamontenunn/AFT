@@ -183,7 +183,11 @@ Repository layer:
 
 - `lib/data/aft_repository.dart` (interface + codecs)
 - `lib/data/aft_repository_local.dart` (SharedPreferences)
+- `lib/data/aft_repository_firestore.dart` (Firestore sync)
 - `lib/data/repository_providers.dart`
+
+Signed-in users sync saved sets across devices via Firestore.
+Default profile settings sync to `users/{uid}` under `defaultProfile`.
 
 ### Saved model
 
@@ -199,8 +203,12 @@ Repository layer:
 `lib/features/saves/guest_migration.dart`:
 
 - guest bucket key: `scoreSets:guest`
-- user bucket key: `scoreSets:{uid}`
-- migrated flag: `guestMigrated:{uid}`
+- anonymous guest bucket: `scoreSets:guest:{anonUid}`
+- legacy local user bucket: `scoreSets:{uid}`
+- user data path: `users/{uid}/scoreSets`
+- guest data is copied into Firestore when present
+- profile settings path: `users/{uid}` → `defaultProfile`
+- guest data is tied to the first signed-in account on that device
 
 ---
 

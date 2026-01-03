@@ -1,5 +1,6 @@
 // CocoaPods integration (required for device builds).
-#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"
 
 // Flutter-generated build settings.
 #include "Generated.xcconfig"
+

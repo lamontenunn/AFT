@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'state/settings_state.dart';
 import 'theme/army_theme.dart';
 import 'router/app_router.dart';
+import 'features/auth/auth_side_effects.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(authSideEffectsProvider);
     final settings = ref.watch(settingsProvider);
 
     return MaterialApp(

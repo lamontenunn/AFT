@@ -98,18 +98,47 @@ void main() {
 }
 
 class _TestSettingsController extends SettingsController {
-  _TestSettingsController(SettingsState seed) : super(_FakeRef()) {
+  _TestSettingsController(SettingsState seed) : super(_fakeRef) {
     state = seed;
   }
 
   @override
-  Future<void> setDefaultProfile(DefaultProfileSettings profile) async {
+  Future<void> setDefaultProfile(
+    DefaultProfileSettings profile, {
+    DateTime? updatedAt,
+    bool syncRemote = true,
+  }) async {
     state = state.copyWith(defaultProfile: profile);
   }
+
 }
+
+final _fakeRef = _FakeRef();
 
 // Minimal fake Ref so SettingsController constructor can run; we bypass _load.
 class _FakeRef implements Ref {
   @override
+  ProviderSubscription<T> listen<T>(
+    ProviderListenable<T> provider,
+    void Function(T? previous, T next) listener, {
+    void Function(Object, StackTrace)? onError,
+    bool? fireImmediately,
+  }) {
+    return _NoopSubscription<T>(_container);
+  }
+
+  @override
+  T read<T>(ProviderListenable<T> provider) => _container.read(provider);
+
+  final ProviderContainer _container = ProviderContainer();
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _NoopSubscription<T> extends ProviderSubscription<T> {
+  _NoopSubscription(ProviderContainer source) : super(source);
+
+  @override
+  T read() => throw UnimplementedError();
 }

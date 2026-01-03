@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
@@ -13,6 +14,7 @@ class ScoreSet {
   final AftInputs inputs;
   final AftComputed? computed;
   final DateTime createdAt;
+  static final Random _idRng = Random();
 
   ScoreSet({
     String? id,
@@ -20,7 +22,13 @@ class ScoreSet {
     required this.inputs,
     required this.createdAt,
     this.computed,
-  }) : id = id ?? createdAt.toIso8601String();
+  }) : id = id ?? _newId(createdAt);
+
+  static String _newId(DateTime createdAt) {
+    final micros = createdAt.microsecondsSinceEpoch;
+    final nonce = _idRng.nextInt(1 << 32).toRadixString(16).padLeft(8, '0');
+    return '$micros-$nonce';
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
