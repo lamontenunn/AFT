@@ -907,13 +907,6 @@ class _EditDefaultProfileScreenState
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('On profile'),
-              value: _draft.onProfile,
-              onChanged: (v) => _setDraft(_draft.copyWith(onProfile: v)),
-            ),
             const SizedBox(height: 18),
             Text('Demographics',
                 style: theme.textTheme.titleSmall

@@ -10,7 +10,7 @@ It is intended for internal developers and AI agents who need to understand the 
 ## TL;DR
 
 - Auth is backed by FirebaseAuth.
-- The source of truth is FirebaseAuth.authStateChanges().
+- The source of truth is FirebaseAuth.userChanges().
 - Routing is gated by AuthGate across app routes:
   - user == null -> SignInPage
   - user != null -> app shell
@@ -24,6 +24,7 @@ It is intended for internal developers and AI agents who need to understand the 
   - anonymous user -> local bucket scoreSets:guest:{anonUid}
   - signed-in (non-anonymous) user -> Firestore users/{uid}/scoreSets
 - Default profile settings are stored locally per user scope and sync to Firestore for signed-in users.
+- When a guest upgrades to an account, profile data is migrated from guest scope to uid scope.
 - Guest migration merges legacy local buckets and clears them only after a verified server write.
 
 ---
@@ -69,7 +70,7 @@ main.dart
        └─ App
             ├─ authSideEffectsProvider (listens to auth changes)
             └─ AppRouter -> AuthGate(child: route)
-                 └─ firebaseUserProvider (authStateChanges)
+                 └─ firebaseUserProvider (userChanges)
                       ├─ null  -> SignInPage
                       └─ User  -> App shell
 ```
@@ -100,13 +101,14 @@ Purpose:
 final firebaseUserProvider = StreamProvider<User?>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
   if (auth == null) return Stream<User?>.value(null);
-  return auth.authStateChanges();
+  return auth.userChanges();
 });
 ```
 
 Purpose:
 
-- Wraps authStateChanges() as a Riverpod StreamProvider.
+- Wraps userChanges() as a Riverpod StreamProvider.
+- Includes anon -> email/password link upgrades (authStateChanges does not always emit).
 - If Firebase is not initialized, the app behaves as signed out.
 
 ### authUserProvider
@@ -234,7 +236,7 @@ Current sign-in methods:
 Navigation:
 
 - The page attempts to Navigator.pop() after successful sign-in.
-- AuthGate will rebuild to the signed-in shell when authStateChanges() emits a user.
+- AuthGate will rebuild to the signed-in shell when userChanges() emits a user.
 
 ---
 
@@ -316,6 +318,8 @@ Behavior:
   - guest:{anonUid}
   - uid
 - On auth change, the controller loads the scoped profile.
+- When a guest upgrades to a real account (same uid), guest-scoped profile data
+  is copied into the uid scope before Firestore sync.
 - For signed-in users, it syncs with Firestore users/{uid}.
 - updatedAt is used for last-write-wins resolution.
 
@@ -346,7 +350,8 @@ Behavior:
 
 1. User uses app as guest; saved sets exist in guest:{anonUid}.
 2. User registers while anonymous; credentials are linked (uid preserved).
-3. authSideEffectsProvider sees anon -> non-anon and migrates guest data into Firestore.
+3. SettingsController migrates guest-scoped profile data into the uid scope.
+4. authSideEffectsProvider sees anon -> non-anon and migrates guest data into Firestore.
 
 ---
 

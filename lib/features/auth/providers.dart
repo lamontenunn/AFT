@@ -10,12 +10,12 @@ final firebaseAuthProvider = Provider<FirebaseAuth?>((ref) {
   return FirebaseAuth.instance;
 });
 
-/// Firebase user stream
+/// Firebase user stream (includes profile/credential changes like anon upgrades).
 final firebaseUserProvider = StreamProvider<User?>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
   // If Firebase isn't initialized (e.g., tests), appear signed out.
   if (auth == null) return Stream<User?>.value(null);
-  return auth.authStateChanges();
+  return auth.userChanges();
 });
 
 /// Current Firebase user (fallback to currentUser while stream loads).

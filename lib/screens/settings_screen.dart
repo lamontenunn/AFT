@@ -111,11 +111,6 @@ class SettingsScreen extends ConsumerWidget {
                         ? dp.payGrade!.trim()
                         : 'Not set',
                   ),
-                  const SizedBox(height: 8),
-                  _SummaryRow(
-                    label: 'On profile',
-                    value: dp.onProfile ? 'Yes' : 'No',
-                  ),
                   const Divider(height: 20),
                   _SummaryRow(
                     label: 'Birthdate',
@@ -222,48 +217,7 @@ class SettingsScreen extends ConsumerWidget {
         ),
         const Divider(height: 1),
 
-        // About
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            'About',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-        FutureBuilder<PackageInfo>(
-          future: PackageInfo.fromPlatform(),
-          builder: (context, snap) {
-            final info = snap.data;
-            final version = info?.version ?? '—';
-            final build = info?.buildNumber ?? '—';
-            return ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text('Version $version ($build)'),
-              subtitle: const Text('AFT Calculator'),
-              onTap: () {
-                showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('About'),
-                    content: const Text('Made by Nunn Technologies'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        ),
-
         // Appearance (moved to bottom)
-        const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
@@ -309,6 +263,47 @@ class SettingsScreen extends ConsumerWidget {
             selected: {settings.themeMode},
             onSelectionChanged: null, // Disabled: coming soon
           ),
+        ),
+        const Divider(height: 1),
+
+        // About
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            'About',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snap) {
+            final info = snap.data;
+            final version = info?.version ?? '—';
+            final build = info?.buildNumber ?? '—';
+            return ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: Text('Version $version ($build)'),
+              subtitle: const Text('AFT Calculator'),
+              onTap: () {
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('About'),
+                    content: const Text('Made by Nunn Technologies'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
         ),
         const SizedBox(height: 12),
       ],

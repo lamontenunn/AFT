@@ -291,6 +291,9 @@ class SettingsController extends StateNotifier<SettingsState> {
         _activeUserId != expectedUserId) {
       return;
     }
+    if (user != null && !user.isAnonymous) {
+      await _maybeMigrateGuestProfileToUser(user.uid);
+    }
     await _loadProfileForScope(nextScope, allowLegacy: true);
     if (!mounted ||
         _activeScope != nextScope ||
@@ -313,6 +316,31 @@ class SettingsController extends StateNotifier<SettingsState> {
   }
 
   String _scopedKey(String base, String scope) => '$base:$scope';
+
+  Future<void> _maybeMigrateGuestProfileToUser(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final guestScope = 'guest:$uid';
+    if (!_hasScopedProfileData(prefs, guestScope)) return;
+    final guestProfile = _readProfileFromPrefs(prefs, scope: guestScope);
+    if (!_profileHasData(guestProfile)) return;
+    final guestUpdatedAt =
+        prefs.getInt(_scopedKey(_kDpUpdatedAt, guestScope)) ?? 0;
+    final userUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, uid)) ?? 0;
+    if (userUpdatedAt >= guestUpdatedAt &&
+        _hasScopedProfileData(prefs, uid)) {
+      return;
+    }
+    await _writeProfileToPrefs(
+      prefs,
+      uid,
+      guestProfile,
+      guestUpdatedAt > 0
+          ? guestUpdatedAt
+          : DateTime.now().millisecondsSinceEpoch,
+    );
+    await _clearScopedProfilePrefs(prefs, guestScope);
+  }
 
   bool _hasScopedProfileData(SharedPreferences prefs, String scope) {
     for (final base in _dpScopedKeys) {
@@ -620,6 +648,15 @@ class SettingsController extends StateNotifier<SettingsState> {
     }
     await prefs.remove(_kDefaultBirthdate);
     await prefs.remove(_kDefaultSex);
+  }
+
+  Future<void> _clearScopedProfilePrefs(
+    SharedPreferences prefs,
+    String scope,
+  ) async {
+    for (final key in _dpScopedKeys) {
+      await prefs.remove(_scopedKey(key, scope));
+    }
   }
 
   Future<void> setHapticsEnabled(bool enabled) async {

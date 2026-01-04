@@ -236,8 +236,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
     final profile = ref.watch(aftProfileProvider);
     final computed = ref.watch(aftComputedProvider);
     final inputs = ref.watch(aftInputsProvider);
@@ -259,14 +257,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
 
     // Fail rule: if any *known* event score is < 60.
     // (We ignore null scores so missing inputs don't immediately show as failing.)
-    final bool isFail = [
-      computed.mdlScore,
-      computed.pushUpsScore,
-      computed.sdcScore,
-      computed.plankScore,
-      computed.run2miScore,
-    ].any((s) => s != null && s < 60);
-
     // React to Settings changes while on Calculator (apply defaults when not editing)
     ref.listen<SettingsState>(settingsProvider, (prev, next) {
       final editingNow = ref.read(editingSetProvider);
@@ -352,89 +342,34 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-
-          // Total summary (sticky)
-          Material(
-            color: theme.colorScheme.surface,
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      label: 'Total score',
-                      value: computed.total?.toString() ?? 'No total yet',
-                      child: Text(
-                        computed.total == null
-                            ? 'Total: —'
-                            : 'Total: ${computed.total}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: isFail ? Colors.red : cs.onSurface,
-                        ),
-                      ),
-                    ),
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // Greeting row (only when we have both last name + rank abbrev).
+            if (canShowGreeting)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: SizedBox(
+                  height: 60,
+                  child: _RankGreetingRow(
+                    rankAbbrev: rankAbbrev!,
+                    lastName: lastName!,
                   ),
-                  if (computed.total != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: ShapeDecoration(
-                        shape: StadiumBorder(
-                          side: BorderSide(
-                            color: isFail ? Colors.red : ArmyColors.gold,
-                            width: 1.2,
-                          ),
-                        ),
-                      ),
-                      child: Text(
-                        isFail ? 'FAIL' : 'PASS',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          // Greeting row (only when we have both last name + rank abbrev).
-          if (canShowGreeting)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: SizedBox(
-                height: 60,
-                child: _RankGreetingRow(
-                  rankAbbrev: rankAbbrev!,
-                  lastName: lastName!,
                 ),
               ),
-            ),
 
-          Expanded(
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(
-                bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: ListView(
-                padding: EdgeInsets.zero,
+            // Context row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Context row
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
                         Row(
                           children: [
                             // Age picker
@@ -1114,15 +1049,11 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
+          );
   }
 }
 
