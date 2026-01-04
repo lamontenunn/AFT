@@ -36,7 +36,8 @@ class AuthGate extends ConsumerWidget {
             children: [
               const Icon(Icons.error_outline, size: 28),
               const SizedBox(height: 8),
-              Text('Failed to load auth state', style: Theme.of(context).textTheme.bodyMedium),
+              Text('Failed to load auth state',
+                  style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
         ),

@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart' as legacy;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
+import 'package:state_notifier/state_notifier.dart';
 
 enum MeasurementSystem {
   imperial,
@@ -327,8 +329,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     final guestUpdatedAt =
         prefs.getInt(_scopedKey(_kDpUpdatedAt, guestScope)) ?? 0;
     final userUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, uid)) ?? 0;
-    if (userUpdatedAt >= guestUpdatedAt &&
-        _hasScopedProfileData(prefs, uid)) {
+    if (userUpdatedAt >= guestUpdatedAt && _hasScopedProfileData(prefs, uid)) {
       return;
     }
     await _writeProfileToPrefs(
@@ -358,7 +359,8 @@ class SettingsController extends StateNotifier<SettingsState> {
     final dpDobStr = prefs.getString(_scopedKey(_kDpBirthdate, scope));
     final dpSexStr = prefs.getString(_scopedKey(_kDpSex, scope));
     return DefaultProfileSettings(
-      firstName: _emptyToNull(prefs.getString(_scopedKey(_kDpFirstName, scope))),
+      firstName:
+          _emptyToNull(prefs.getString(_scopedKey(_kDpFirstName, scope))),
       lastName: _emptyToNull(prefs.getString(_scopedKey(_kDpLastName, scope))),
       middleInitial:
           _emptyToNull(prefs.getString(_scopedKey(_kDpMiddleInitial, scope))),
@@ -413,8 +415,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     final scopedProfile = _readProfileFromPrefs(prefs, scope: scope);
-    if (_hasScopedProfileData(prefs, scope) ||
-        _profileHasData(scopedProfile)) {
+    if (_hasScopedProfileData(prefs, scope) || _profileHasData(scopedProfile)) {
       state = state.copyWith(defaultProfile: scopedProfile);
       return;
     }
@@ -453,8 +454,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     final scope = uid;
-    final localUpdatedAt =
-        prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
+    final localUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
 
     final doc = await _profileDoc(uid).get();
     if (!mounted) return;
@@ -506,8 +506,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     final scope = _activeScope ?? _signedOutScope;
-    final localUpdatedAt =
-        prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
+    final localUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
     if (updatedAt.millisecondsSinceEpoch <= localUpdatedAt) {
       return;
     }
@@ -588,8 +587,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
     await setOrRemoveString(
         _scopedKey(_kDpFirstName, scope), profile.firstName);
-    await setOrRemoveString(
-        _scopedKey(_kDpLastName, scope), profile.lastName);
+    await setOrRemoveString(_scopedKey(_kDpLastName, scope), profile.lastName);
     await setOrRemoveString(
         _scopedKey(_kDpMiddleInitial, scope), profile.middleInitial);
     await setOrRemoveString(
@@ -597,8 +595,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     await setOrRemoveString(_scopedKey(_kDpUnit, scope), profile.unit);
     await setOrRemoveString(_scopedKey(_kDpMos, scope), profile.mos);
     await setOrRemoveString(_scopedKey(_kDpPayGrade, scope), profile.payGrade);
-    await prefs.setBool(
-        _scopedKey(_kDpOnProfile, scope), profile.onProfile);
+    await prefs.setBool(_scopedKey(_kDpOnProfile, scope), profile.onProfile);
 
     if (profile.birthdate == null) {
       await prefs.remove(_scopedKey(_kDpBirthdate, scope));
@@ -620,15 +617,13 @@ class SettingsController extends StateNotifier<SettingsState> {
     if (profile.height == null) {
       await prefs.remove(_scopedKey(_kDpHeight, scope));
     } else {
-      await prefs.setDouble(
-          _scopedKey(_kDpHeight, scope), profile.height!);
+      await prefs.setDouble(_scopedKey(_kDpHeight, scope), profile.height!);
     }
 
     if (profile.weight == null) {
       await prefs.remove(_scopedKey(_kDpWeight, scope));
     } else {
-      await prefs.setDouble(
-          _scopedKey(_kDpWeight, scope), profile.weight!);
+      await prefs.setDouble(_scopedKey(_kDpWeight, scope), profile.weight!);
     }
 
     if (profile.bodyFatPercent == null) {
@@ -638,8 +633,7 @@ class SettingsController extends StateNotifier<SettingsState> {
           _scopedKey(_kDpBodyFat, scope), profile.bodyFatPercent!);
     }
 
-    await prefs.setInt(
-        _scopedKey(_kDpUpdatedAt, scope), updatedAtMillis);
+    await prefs.setInt(_scopedKey(_kDpUpdatedAt, scope), updatedAtMillis);
   }
 
   Future<void> _clearLegacyProfilePrefs(SharedPreferences prefs) async {
@@ -826,8 +820,8 @@ class SettingsController extends StateNotifier<SettingsState> {
       unit: _emptyToNull(data['unit'] as String?),
       mos: _emptyToNull(data['mos'] as String?),
       payGrade: _emptyToNull(data['payGrade'] as String?),
-      onProfile:
-          data['onProfile'] as bool? ?? DefaultProfileSettings.defaults.onProfile,
+      onProfile: data['onProfile'] as bool? ??
+          DefaultProfileSettings.defaults.onProfile,
       sex: _parseSex(data['sex'] as String?),
       birthdate: _coerceDate(data['birthdate']),
       measurementSystem: _measurementFromValue(data['measurementSystem']),
@@ -876,6 +870,6 @@ class SettingsController extends StateNotifier<SettingsState> {
 }
 
 final settingsProvider =
-    StateNotifierProvider<SettingsController, SettingsState>((ref) {
+    legacy.StateNotifierProvider<SettingsController, SettingsState>((ref) {
   return SettingsController(ref);
 });

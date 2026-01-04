@@ -215,6 +215,7 @@ class SavedSetsScreen extends ConsumerWidget {
                         context: context,
                         set: set,
                         profile: profile,
+                        userScope: effectiveId,
                       );
                     },
                     onEdit: () async {

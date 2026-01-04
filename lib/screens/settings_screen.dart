@@ -313,7 +313,7 @@ class SettingsScreen extends ConsumerWidget {
 // Local helper: compute age in years from DOB at today.
   int _ageFromDob(DateTime dob) {
     final now = DateTime.now();
-    int age = now.year - dob.year;
+    int age = (DateTime.now().year - dob.year).toInt();
     final hasHadBirthdayThisYear = (now.month > dob.month) ||
         (now.month == dob.month && now.day >= dob.day);
     if (!hasHadBirthdayThisYear) age--;

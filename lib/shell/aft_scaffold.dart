@@ -384,6 +384,7 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
                 context: context,
                 set: set,
                 profile: profile,
+                userScope: userId,
               );
             },
             onEdit: () {},
@@ -428,6 +429,7 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
                 context: context,
                 set: set,
                 profile: profile,
+                userScope: userId,
               );
             },
             onEdit: () {},
@@ -605,7 +607,8 @@ class _ProfileButton extends ConsumerWidget {
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('Sign out?'),
-                            content: const Text('You can sign back in at any time.'),
+                            content:
+                                const Text('You can sign back in at any time.'),
                             actions: [
                               TextButton(
                                   onPressed: () => Navigator.of(ctx).pop(false),
