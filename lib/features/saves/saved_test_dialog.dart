@@ -16,6 +16,7 @@ Future<void> showSavedTestDialog(
   required ScoreSet set,
   VoidCallback? onEdit,
   VoidCallback? onDelete,
+  Future<void> Function()? onExportDa705,
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
@@ -192,6 +193,14 @@ Future<void> showSavedTestDialog(
               onDelete();
             },
             child: const Text('Delete'),
+          ),
+        if (onExportDa705 != null)
+          FilledButton.tonal(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await onExportDa705();
+            },
+            child: const Text('Export DA 705'),
           ),
         if (onEdit != null)
           FilledButton.tonal(

@@ -47,6 +47,7 @@ Additional docs:
 
 - Anonymous sign-in supported.
 - Guest data can be migrated into a real user bucket on first non-anonymous sign-in.
+- Saved tests can be exported to DA Form 705 (page 1) using profile defaults when available.
 
 ### Settings
 
