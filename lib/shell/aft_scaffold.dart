@@ -117,6 +117,7 @@ class AftScaffold extends ConsumerWidget {
               foregroundColor: Colors.black,
               elevation: 0,
               centerTitle: true,
+              bottom: routeName == Routes.home ? const _HomeTotalBar() : null,
               title: Text(
                 switch (routeName) {
                   Routes.home => 'Home',
@@ -146,6 +147,76 @@ class AftScaffold extends ConsumerWidget {
           top: routeName == Routes.standards,
           bottom: true,
           child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeTotalBar extends ConsumerWidget implements PreferredSizeWidget {
+  const _HomeTotalBar();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(52);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final computed = ref.watch(aftComputedProvider);
+    final bool isFail = [
+      computed.mdlScore,
+      computed.pushUpsScore,
+      computed.sdcScore,
+      computed.plankScore,
+      computed.run2miScore,
+    ].any((s) => s != null && s < 60);
+
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                label: 'Total score',
+                value: computed.total?.toString() ?? 'No total yet',
+                child: Text(
+                  computed.total == null
+                      ? 'Total: —'
+                      : 'Total: ${computed.total}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: isFail ? Colors.red : cs.onSurface,
+                  ),
+                ),
+              ),
+            ),
+            if (computed.total != null)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: ShapeDecoration(
+                  shape: StadiumBorder(
+                    side: BorderSide(
+                      color: isFail ? Colors.red : ArmyColors.gold,
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  isFail ? 'FAIL' : 'PASS',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -454,74 +525,97 @@ class _ProfileButton extends ConsumerWidget {
       useSafeArea: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) {
-        if (!auth.isSignedIn) {
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('Sign in to save scores'),
+        return Consumer(
+          builder: (context, ref, _) {
+            final authState = ref.watch(authStateProvider);
+            if (!authState.isSignedIn) {
+              return SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const ListTile(
+                      leading: Icon(Icons.info_outline),
+                      title: Text('Sign in to save scores'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.login),
+                      title: const Text('Sign in'),
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pushNamed(Routes.signIn);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                 ),
-                ListTile(
-                  leading: const Icon(Icons.login),
-                  title: const Text('Sign in'),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pushNamed(Routes.signIn);
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          );
-        } else {
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: const Text('Sign out'),
-                  onTap: () async {
-                    final asyncUser = ref.read(firebaseUserProvider);
-                    final user = asyncUser.asData?.value;
-                    final isAnon = user?.isAnonymous ?? true;
-                    final ok = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Sign out?'),
-                        content: Text(
-                          isAnon
-                              ? 'Guest data stays on this device and can be merged when you sign in later.'
-                              : 'You can sign back in at any time.',
-                        ),
-                        actions: [
-                          TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Cancel')),
-                          FilledButton(
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('Sign out')),
-                        ],
+              );
+            }
+            final isGuest = ref.watch(isGuestUserProvider);
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isGuest) ...[
+                    const ListTile(
+                      leading: Icon(Icons.person_outline),
+                      title: Text('Guest account'),
+                      subtitle: Text(
+                        'Create an account to keep data across devices.',
                       ),
-                    );
-                    if (ok != true) return;
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.person_add),
+                      title: const Text('Create account'),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pushNamed(Routes.signIn);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.login),
+                      title: const Text('Sign in'),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pushNamed(Routes.signIn);
+                      },
+                    ),
+                  ] else
+                    ListTile(
+                      leading: const Icon(Icons.logout),
+                      title: const Text('Sign out'),
+                      onTap: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Sign out?'),
+                            content: const Text('You can sign back in at any time.'),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('Cancel')),
+                              FilledButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  child: const Text('Sign out')),
+                            ],
+                          ),
+                        );
+                        if (ok != true) return;
 
-                    Navigator.of(context).pop();
-                    await ref.read(authActionsProvider).signOut();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Signed out')),
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          );
-        }
+                        Navigator.of(context).pop();
+                        await ref.read(authActionsProvider).signOut();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Signed out')),
+                          );
+                        }
+                      },
+                    ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
+        );
       },
     );
   }
