@@ -292,7 +292,21 @@ class SettingsScreen extends ConsumerWidget {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('About'),
-                    content: const Text('Made by Nunn Technologies'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Made by Nunn Technologies'),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Not affiliated with or endorsed by the U.S. Army or Department of Defense.',
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                                color:
+                                    Theme.of(ctx).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),

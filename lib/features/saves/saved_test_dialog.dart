@@ -209,7 +209,7 @@ Future<void> showSavedTestDialog(
                     await onExportDa705();
                   },
                   style: compactFilledStyle,
-                  child: const Text('Export to DA-706'),
+                  child: const Text('Export to DA-705'),
                 ),
                 const SizedBox(height: 6),
               ],

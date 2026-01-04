@@ -93,7 +93,7 @@ Future<_Da705WarnChoice?> _maybeConfirmDa705Export(
         TextButton(
           onPressed: () =>
               Navigator.of(ctx).pop(_Da705WarnChoice.exportBlank),
-          child: const Text('Export without profile'),
+          child: const Text('Export without profile data'),
         ),
         FilledButton(
           onPressed: () => Navigator.of(ctx).pop(_Da705WarnChoice.export),

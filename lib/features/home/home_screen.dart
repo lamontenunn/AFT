@@ -1045,6 +1045,7 @@ class _RankGreetingRow extends StatelessWidget {
     final cs = theme.colorScheme;
 
     final assetPath = rankAssetByAbbrev[rankAbbrev];
+    final rankLabel = rankDisplayLabel(rankAbbrev);
 
     // If insignia is missing/unavailable (PV1), show a minimal neutral glyph.
     Widget fallbackGlyph() => Icon(
@@ -1060,7 +1061,7 @@ class _RankGreetingRow extends StatelessWidget {
             width: 56,
             height: 56,
             fit: BoxFit.contain,
-            semanticsLabel: '$rankAbbrev rank insignia',
+            semanticsLabel: '$rankLabel rank insignia',
             // If decoding fails, render the neutral glyph instead of crashing.
             placeholderBuilder: (_) => fallbackGlyph(),
           );
@@ -1078,7 +1079,7 @@ class _RankGreetingRow extends StatelessWidget {
         const SizedBox(width: 6),
         Expanded(
           child: Text(
-            'Hello, $rankAbbrev $lastName',
+            'Hello, $rankLabel $lastName',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.titleMedium

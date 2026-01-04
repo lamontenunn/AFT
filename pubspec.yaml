@@ -39,6 +39,13 @@ dev_dependencies:
   fake_cloud_firestore: ^4.0.1
   integration_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
