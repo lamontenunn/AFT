@@ -89,7 +89,8 @@ class GuestMigration {
         ? <ScoreSet>[]
         : decodeScoreSets(existingUser);
     final anonUid = prefs.getString(lastAnonUidKey());
-    final anonGuest = anonUid == null ? null : prefs.getString(guestKeyForUid(anonUid));
+    final anonGuest =
+        anonUid == null ? null : prefs.getString(guestKeyForUid(anonUid));
     final anonSets = anonGuest == null || anonGuest.isEmpty
         ? <ScoreSet>[]
         : decodeScoreSets(anonGuest);

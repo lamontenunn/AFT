@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
@@ -110,8 +110,10 @@ void main() {
     test('Anchors and boundaries - M17–21', () {
       expect(run2miPointsForSex(AftSex.male, 20, _mmss('13:22')), 100);
       expect(run2miPointsForSex(AftSex.male, 20, _mmss('19:57')), 60);
-      expect(run2miPointsForSex(AftSex.male, 20, _mmss('13:21')), 100); // faster is fine
-      expect(run2miPointsForSex(AftSex.male, 20, _mmss('13:23')), lessThan(100));
+      expect(run2miPointsForSex(AftSex.male, 20, _mmss('13:21')),
+          100); // faster is fine
+      expect(
+          run2miPointsForSex(AftSex.male, 20, _mmss('13:23')), lessThan(100));
     });
 
     test('Anchors - F17–21', () {
@@ -127,7 +129,8 @@ void main() {
       final malePts = mdlPointsForSex(AftSex.male, 24, 330);
       final combatPts = svc.scoreEvent(
         AftStandard.combat,
-        const AftProfile(age: 24, sex: AftSex.female, standard: AftStandard.general),
+        const AftProfile(
+            age: 24, sex: AftSex.female, standard: AftStandard.general),
         AftEvent.mdl,
         330,
       );
@@ -138,7 +141,8 @@ void main() {
       final malePts = hrpPointsForSex(AftSex.male, 24, 40);
       final combatPts = svc.scoreEvent(
         AftStandard.combat,
-        const AftProfile(age: 24, sex: AftSex.female, standard: AftStandard.general),
+        const AftProfile(
+            age: 24, sex: AftSex.female, standard: AftStandard.general),
         AftEvent.pushUps,
         40,
       );
@@ -150,7 +154,8 @@ void main() {
       final malePts = sdcPointsForSex(AftSex.male, 24, t);
       final combatPts = svc.scoreEvent(
         AftStandard.combat,
-        const AftProfile(age: 24, sex: AftSex.female, standard: AftStandard.general),
+        const AftProfile(
+            age: 24, sex: AftSex.female, standard: AftStandard.general),
         AftEvent.sdc,
         t,
       );
@@ -162,7 +167,8 @@ void main() {
       final malePts = plkPointsForSex(AftSex.male, 24, t);
       final combatPts = svc.scoreEvent(
         AftStandard.combat,
-        const AftProfile(age: 24, sex: AftSex.female, standard: AftStandard.general),
+        const AftProfile(
+            age: 24, sex: AftSex.female, standard: AftStandard.general),
         AftEvent.plank,
         t,
       );
@@ -174,7 +180,8 @@ void main() {
       final malePts = run2miPointsForSex(AftSex.male, 24, t);
       final combatPts = svc.scoreEvent(
         AftStandard.combat,
-        const AftProfile(age: 24, sex: AftSex.female, standard: AftStandard.general),
+        const AftProfile(
+            age: 24, sex: AftSex.female, standard: AftStandard.general),
         AftEvent.run2mi,
         t,
       );
@@ -190,7 +197,9 @@ void main() {
       // Profile context
       container.read(aftProfileProvider.notifier).setAge(20);
       container.read(aftProfileProvider.notifier).setSex(AftSex.male);
-      container.read(aftProfileProvider.notifier).setStandard(AftStandard.general);
+      container
+          .read(aftProfileProvider.notifier)
+          .setStandard(AftStandard.general);
 
       AftComputed comp() => container.read(aftComputedProvider);
 

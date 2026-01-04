@@ -61,7 +61,7 @@ class ArmyTheme {
           borderSide: BorderSide(color: ArmyColors.gold, width: 1.5),
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: ArmyColors.green.withOpacity(0.06),
         shadowColor: Colors.transparent,
         surfaceTintColor: ArmyColors.green,
@@ -201,7 +201,7 @@ class ArmyTheme {
           borderSide: BorderSide(color: ArmyColors.gold, width: 1.5),
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: ArmyColors.green.withOpacity(0.12),
         shadowColor: Colors.transparent,
         surfaceTintColor: ArmyColors.green,

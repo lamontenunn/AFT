@@ -4,11 +4,13 @@ import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/data/aft_repository.dart';
 import 'package:aft_firebase_app/features/saves/guest_migration.dart';
+import 'package:aft_firebase_app/features/saves/da705_export.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
 import 'package:aft_firebase_app/features/saves/saved_test_dialog.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
+import 'package:aft_firebase_app/state/settings_state.dart';
 
 /// Body-only screen for Saved Sets (no nested Scaffold/AppBar).
 /// AftScaffold provides the global AppBar/NavigationBar.
@@ -207,6 +209,15 @@ class SavedSetsScreen extends ConsumerWidget {
                   await showSavedTestDialog(
                     context,
                     set: set,
+                    onExportDa705: () async {
+                      final profile = ref.read(settingsProvider).defaultProfile;
+                      await exportDa705Pdf(
+                        context: context,
+                        set: set,
+                        profile: profile,
+                        userScope: effectiveId,
+                      );
+                    },
                     onEdit: () async {
                       // Load into calculator for editing
                       final p = set.profile;

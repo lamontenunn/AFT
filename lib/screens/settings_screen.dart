@@ -292,7 +292,21 @@ class SettingsScreen extends ConsumerWidget {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('About'),
-                    content: const Text('Made by Nunn Technologies'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Made by Nunn Technologies'),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Not affiliated with or endorsed by the U.S. Army or Department of Defense.',
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                                color:
+                                    Theme.of(ctx).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),
@@ -313,7 +327,7 @@ class SettingsScreen extends ConsumerWidget {
 // Local helper: compute age in years from DOB at today.
   int _ageFromDob(DateTime dob) {
     final now = DateTime.now();
-    int age = now.year - dob.year;
+    int age = (DateTime.now().year - dob.year).toInt();
     final hasHadBirthdayThisYear = (now.month > dob.month) ||
         (now.month == dob.month && now.day >= dob.day);
     if (!hasHadBirthdayThisYear) age--;
