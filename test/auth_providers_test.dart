@@ -4,7 +4,7 @@ import 'package:aft_firebase_app/features/aft/state/aft_inputs.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_auth.dart';
@@ -17,7 +17,8 @@ void main() {
     expect(container.read(firebaseAuthProvider), isNull);
   });
 
-  test('aftRepositoryProvider returns DisabledAftRepository when signed out', () async {
+  test('aftRepositoryProvider returns DisabledAftRepository when signed out',
+      () async {
     final auth = MockFirebaseAuth();
     final container = ProviderContainer(
       overrides: [
@@ -31,7 +32,8 @@ void main() {
     expect(repo, isA<DisabledAftRepository>());
 
     final set = ScoreSet(
-      profile: AftProfile(age: 20, sex: AftSex.male, standard: AftStandard.general),
+      profile:
+          AftProfile(age: 20, sex: AftSex.male, standard: AftStandard.general),
       inputs: const AftInputs(),
       createdAt: DateTime(2024, 1, 1),
     );

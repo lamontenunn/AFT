@@ -10,7 +10,7 @@ import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mocktail/mocktail.dart';
@@ -38,7 +38,8 @@ void main() {
   test('Anonymous saves locally under scoreSets:guest:{anonUid}', () async {
     const userId = 'guest:anon1';
     final local = LocalAftRepository();
-    await local.saveScoreSet(userId: userId, set: _makeSet(DateTime(2024, 1, 1)));
+    await local.saveScoreSet(
+        userId: userId, set: _makeSet(DateTime(2024, 1, 1)));
 
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('scoreSets:$userId');
@@ -97,7 +98,8 @@ void main() {
     expect(spy.trackedUids, ['anon42']);
   });
 
-  test('GuestMigration moves anon sets to Firestore and clears local', () async {
+  test('GuestMigration moves anon sets to Firestore and clears local',
+      () async {
     final firestore = FakeFirebaseFirestore();
     await GuestMigration.trackGuestUser('anon1');
 

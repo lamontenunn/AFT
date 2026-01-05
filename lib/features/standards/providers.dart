@@ -6,7 +6,8 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
-import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart' show AftEvent;
+import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart'
+    show AftEvent;
 import 'package:aft_firebase_app/features/standards/state/standards_selection.dart';
 import 'package:aft_firebase_app/features/standards/standards_loader.dart';
 import 'package:aft_firebase_app/features/standards/display_utils.dart';
@@ -38,7 +39,8 @@ final mdlColumnProvider = Provider<List<String>>((ref) {
 final hrpColumnProvider = Provider<List<String>>((ref) {
   final sex = ref.watch(effectiveSexProvider);
   final band = ref.watch(ageBandProvider);
-  return loadEventColumn(event: AftEvent.pushUps, effectiveSex: sex, ageBand: band);
+  return loadEventColumn(
+      event: AftEvent.pushUps, effectiveSex: sex, ageBand: band);
 });
 
 final sdcColumnProvider = Provider<List<String>>((ref) {
@@ -50,13 +52,15 @@ final sdcColumnProvider = Provider<List<String>>((ref) {
 final plkColumnProvider = Provider<List<String>>((ref) {
   final sex = ref.watch(effectiveSexProvider);
   final band = ref.watch(ageBandProvider);
-  return loadEventColumn(event: AftEvent.plank, effectiveSex: sex, ageBand: band);
+  return loadEventColumn(
+      event: AftEvent.plank, effectiveSex: sex, ageBand: band);
 });
 
 final run2miColumnProvider = Provider<List<String>>((ref) {
   final sex = ref.watch(effectiveSexProvider);
   final band = ref.watch(ageBandProvider);
-  return loadEventColumn(event: AftEvent.run2mi, effectiveSex: sex, ageBand: band);
+  return loadEventColumn(
+      event: AftEvent.run2mi, effectiveSex: sex, ageBand: band);
 });
 
 // Full standards rows (101)

@@ -5,7 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Shows the Combat MOS info dialog if the user hasn't disabled it.
 /// Uses Material 3 AlertDialog with scrollable content and a "Don't show again" option.
-Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) async {
+Future<void> maybeShowCombatInfoDialog(
+    BuildContext context, WidgetRef ref) async {
   final settings = ref.read(settingsProvider);
   if (!settings.showCombatInfo) return;
 
@@ -42,7 +43,8 @@ Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) asyn
                   CheckboxListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: dontShowAgain,
-                    onChanged: (v) => setState(() => dontShowAgain = v ?? false),
+                    onChanged: (v) =>
+                        setState(() => dontShowAgain = v ?? false),
                     title: const Text("Don't show again"),
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
@@ -61,7 +63,9 @@ Future<void> maybeShowCombatInfoDialog(BuildContext context, WidgetRef ref) asyn
             FilledButton(
               onPressed: () async {
                 if (dontShowAgain) {
-                  await ref.read(settingsProvider.notifier).setShowCombatInfo(false);
+                  await ref
+                      .read(settingsProvider.notifier)
+                      .setShowCombatInfo(false);
                 }
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },

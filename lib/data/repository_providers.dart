@@ -76,17 +76,21 @@ class HybridAftRepository implements AftRepository {
 /// No-op repository used when signed out to prevent cross-account leakage.
 class DisabledAftRepository implements AftRepository {
   @override
-  Future<void> saveScoreSet({required String userId, required ScoreSet set}) async {}
+  Future<void> saveScoreSet(
+      {required String userId, required ScoreSet set}) async {}
 
   @override
-  Future<void> updateScoreSet({required String userId, required ScoreSet set}) async {}
+  Future<void> updateScoreSet(
+      {required String userId, required ScoreSet set}) async {}
 
   @override
-  Future<void> deleteScoreSet({required String userId, required String id}) async {}
+  Future<void> deleteScoreSet(
+      {required String userId, required String id}) async {}
 
   @override
   Future<void> clearScoreSets({required String userId}) async {}
 
   @override
-  Future<List<ScoreSet>> listScoreSets({required String userId}) async => <ScoreSet>[];
+  Future<List<ScoreSet>> listScoreSets({required String userId}) async =>
+      <ScoreSet>[];
 }
