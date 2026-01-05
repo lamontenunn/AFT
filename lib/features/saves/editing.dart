@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart' as legacy;
 
 /// Minimal editing context to update an existing saved set in place.
 class ScoreEditing {
@@ -8,4 +9,5 @@ class ScoreEditing {
 }
 
 /// Holds the current editing context, or null if not editing.
-final editingSetProvider = StateProvider<ScoreEditing?>((ref) => null);
+final editingSetProvider =
+    legacy.StateProvider<ScoreEditing?>((Ref ref) => null);

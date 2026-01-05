@@ -12,6 +12,8 @@ const Map<String, String?> rankAssetByAbbrev = <String, String?>{
   'PFC': 'assets/icons/ranks/army_e3_pfc.svg',
   'SPC': 'assets/icons/ranks/army_e4_spc.svg',
   'CPL': 'assets/icons/ranks/army_e4_cpl.svg',
+  'CDT': 'assets/icons/ranks/army_e5_cadet.svg',
+  'CADET': 'assets/icons/ranks/army_e5_cadet.svg',
   'SGT': 'assets/icons/ranks/army_e5_sgt.svg',
   'SSG': 'assets/icons/ranks/army_e6_ssg.svg',
   'SFC': 'assets/icons/ranks/army_e7_sfc.svg',
@@ -80,3 +82,13 @@ const Map<String, String?> rankAbbrevByPayGrade = <String, String?>{
   'O-2E': '1LT',
   'O-3E': 'CPT',
 };
+
+const Map<String, String> rankDisplayByAbbrev = <String, String>{
+  'CDT': 'CDT',
+  'CADET': 'CDT',
+};
+
+String rankDisplayLabel(String abbrev) {
+  final key = abbrev.trim().toUpperCase();
+  return rankDisplayByAbbrev[key] ?? key;
+}

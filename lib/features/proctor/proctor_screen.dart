@@ -1280,8 +1280,7 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
   Duration _sdcCumulativeTarget(Duration total, int segmentIndex) {
     final clamped =
         segmentIndex.clamp(0, _sdcSegmentWeights.length - 1).toInt();
-    final weightTotal =
-        _sdcSegmentWeights.fold<double>(0, (sum, w) => sum + w);
+    final weightTotal = _sdcSegmentWeights.fold<double>(0, (sum, w) => sum + w);
     if (weightTotal <= 0) return total;
     double cumulative = 0;
     for (var i = 0; i <= clamped; i++) {
@@ -1357,15 +1356,12 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
     final sdcTarget100 = widget.event == AftEvent.sdc
         ? _parseDurationThreshold(th.pts100)
         : null;
-    final sdcTarget60 = widget.event == AftEvent.sdc
-        ? _parseDurationThreshold(th.pts60)
-        : null;
+    final sdcTarget60 =
+        widget.event == AftEvent.sdc ? _parseDurationThreshold(th.pts60) : null;
     final sdcSegmentCount = _sdcSegments.length;
     final sdcLapCount = swState.lapsCumulative.length;
     final sdcSegmentIndex = widget.event == AftEvent.sdc
-        ? (sdcLapCount >= sdcSegmentCount
-            ? sdcSegmentCount - 1
-            : sdcLapCount)
+        ? (sdcLapCount >= sdcSegmentCount ? sdcSegmentCount - 1 : sdcLapCount)
         : 0;
     final sdcSegmentLabel = _sdcSegments[sdcSegmentIndex];
     final sdcSegmentStartIndex = sdcSegmentIndex - 1;
@@ -1386,9 +1382,8 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
     final sdcOnTrack100 = sdcCumulativeTarget100 == null
         ? null
         : elapsed <= sdcCumulativeTarget100;
-    final sdcOnTrack60 = sdcCumulativeTarget60 == null
-        ? null
-        : elapsed <= sdcCumulativeTarget60;
+    final sdcOnTrack60 =
+        sdcCumulativeTarget60 == null ? null : elapsed <= sdcCumulativeTarget60;
 
     final badgeFail = score != null && score < 60;
     final badgeBg = badgeFail ? Colors.red : ArmyColors.gold;

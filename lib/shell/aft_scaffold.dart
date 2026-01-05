@@ -8,6 +8,7 @@ import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/data/aft_repository.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
+import 'package:aft_firebase_app/features/saves/da705_export.dart';
 import 'package:aft_firebase_app/features/saves/saved_test_dialog.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
@@ -385,6 +386,15 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
           await showSavedTestDialog(
             context,
             set: set,
+            onExportDa705: () async {
+              final profile = ref.read(settingsProvider).defaultProfile;
+              await exportDa705Pdf(
+                context: context,
+                set: set,
+                profile: profile,
+                userScope: userId,
+              );
+            },
             onEdit: () {},
             onDelete: () async {
               final ok = await showDialog<bool>(
@@ -421,6 +431,15 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
           await showSavedTestDialog(
             context,
             set: set,
+            onExportDa705: () async {
+              final profile = ref.read(settingsProvider).defaultProfile;
+              await exportDa705Pdf(
+                context: context,
+                set: set,
+                profile: profile,
+                userScope: userId,
+              );
+            },
             onEdit: () {},
             onDelete: () async {
               final ok = await showDialog<bool>(
@@ -639,7 +658,8 @@ class _ProfileButton extends ConsumerWidget {
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('Sign out?'),
-                            content: const Text('You can sign back in at any time.'),
+                            content:
+                                const Text('You can sign back in at any time.'),
                             actions: [
                               TextButton(
                                   onPressed: () => Navigator.of(ctx).pop(false),

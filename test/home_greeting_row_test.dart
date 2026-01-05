@@ -1,7 +1,7 @@
 import 'package:aft_firebase_app/features/home/home_screen.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -110,7 +110,6 @@ class _TestSettingsController extends SettingsController {
   }) async {
     state = state.copyWith(defaultProfile: profile);
   }
-
 }
 
 final _fakeRef = _FakeRef();

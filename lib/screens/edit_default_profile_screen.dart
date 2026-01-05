@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
+import 'package:aft_firebase_app/features/aft/utils/rank_assets.dart';
 import 'package:aft_firebase_app/features/proctor/tools/body_fat.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 
@@ -53,6 +54,14 @@ class _EditDefaultProfileScreenState
     'O-3E',
   ];
 
+  static const Map<String, List<String>> _rankOptionsByPayGrade =
+      <String, List<String>>{
+    'E-4': ['SPC', 'CPL'],
+    'E-5': ['SGT', 'CDT'],
+    'E-8': ['MSG', '1SG'],
+    'E-9': ['SGM', 'CSM', 'SMA'],
+  };
+
   late final TextEditingController _firstCtrl;
   late final TextEditingController _miCtrl;
   late final TextEditingController _lastCtrl;
@@ -89,7 +98,7 @@ class _EditDefaultProfileScreenState
 
   int _ageFromDob(DateTime dob) {
     final now = DateTime.now();
-    int age = now.year - dob.year;
+    int age = (DateTime.now().year - dob.year).toInt();
     final hasHadBirthdayThisYear = (now.month > dob.month) ||
         (now.month == dob.month && now.day >= dob.day);
     if (!hasHadBirthdayThisYear) age--;
@@ -144,6 +153,103 @@ class _EditDefaultProfileScreenState
   }
 
   void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
+
+  List<String> _rankOptionsForPayGrade(String payGrade) {
+    final normalized = payGrade.trim().toUpperCase();
+    final multi = _rankOptionsByPayGrade[normalized];
+    if (multi != null) return multi;
+    final single = rankAbbrevByPayGrade[normalized];
+    return single == null ? const [] : <String>[single];
+  }
+
+  Future<String?> _showRankPicker({
+    required String payGrade,
+    required List<String> options,
+    bool allowClear = true,
+  }) {
+    final theme = Theme.of(context);
+    final current = _draft.rankAbbrev?.trim().toUpperCase();
+
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: theme.colorScheme.surface,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text('Select Rank ($payGrade)'),
+              trailing: allowClear
+                  ? TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(''),
+                      child: const Text('Clear'),
+                    )
+                  : null,
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (ctx, i) {
+                  final abbrev = options[i];
+                  final selected = abbrev.toUpperCase() == current;
+                  final display = rankDisplayLabel(abbrev);
+                  return ListTile(
+                    title: Text('$payGrade $display'),
+                    trailing:
+                        selected ? const Icon(Icons.check, size: 18) : null,
+                    onTap: () => Navigator.of(ctx).pop(abbrev),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _maybeResolveRankForPayGrade(String payGrade) async {
+    final options = _rankOptionsForPayGrade(payGrade);
+    if (options.isEmpty) return;
+
+    final current = _draft.rankAbbrev?.trim().toUpperCase();
+    if (options.length == 1) {
+      if (current != options.first) {
+        _setDraft(_draft.copyWith(rankAbbrev: options.first));
+      }
+      return;
+    }
+
+    final picked = await _showRankPicker(
+      payGrade: payGrade,
+      options: options,
+      allowClear: false,
+    );
+    if (!mounted) return;
+    if (picked == null) {
+      if (current != null && options.contains(current)) return;
+      _setDraft(_draft.copyWith(rankAbbrev: options.first));
+      return;
+    }
+    _setDraft(_draft.copyWith(rankAbbrev: picked));
+  }
+
+  String _rankLabel() {
+    final payGrade = _payGradeCtrl.text.trim();
+    if (payGrade.isEmpty) return 'Not set';
+    final options = _rankOptionsForPayGrade(payGrade);
+    if (options.isEmpty) return 'Not set';
+    final current = _draft.rankAbbrev?.trim();
+    if (current != null && current.isNotEmpty) {
+      return rankDisplayLabel(current);
+    }
+    return options.length == 1 ? rankDisplayLabel(options.first) : 'Not set';
+  }
 
   Future<void> _pickPayGrade() async {
     _dismissKeyboard();
@@ -238,7 +344,10 @@ class _EditDefaultProfileScreenState
       setState(() {
         _payGradeCtrl.text = '';
         // Keep draft in sync so other UI that depends on _draft updates too.
-        _draft = _draft.copyWith(clearPayGrade: true);
+        _draft = _draft.copyWith(
+          clearPayGrade: true,
+          clearRankAbbrev: true,
+        );
       });
       return;
     }
@@ -246,6 +355,7 @@ class _EditDefaultProfileScreenState
       _payGradeCtrl.text = selected;
       _draft = _draft.copyWith(payGrade: selected);
     });
+    await _maybeResolveRankForPayGrade(selected);
   }
 
   Future<void> _pickBirthdate() async {
@@ -937,6 +1047,29 @@ class _EditDefaultProfileScreenState
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  Text(
+                    'Rank',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _rankLabel(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
             Text('Service',

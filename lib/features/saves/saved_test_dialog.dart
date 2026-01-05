@@ -16,6 +16,7 @@ Future<void> showSavedTestDialog(
   required ScoreSet set,
   VoidCallback? onEdit,
   VoidCallback? onDelete,
+  Future<void> Function()? onExportDa705,
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
@@ -113,6 +114,13 @@ Future<void> showSavedTestDialog(
     ),
   );
 
+  final ButtonStyle compactFilledStyle = FilledButton.styleFrom(
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    visualDensity: VisualDensity.compact,
+    minimumSize: const Size.fromHeight(38),
+    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+  );
+
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -120,7 +128,7 @@ Future<void> showSavedTestDialog(
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: SingleChildScrollView(
-          clipBehavior: Clip.none,
+          padding: const EdgeInsets.only(bottom: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -184,26 +192,61 @@ Future<void> showSavedTestDialog(
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      actionsAlignment: MainAxisAlignment.center,
+      actionsOverflowAlignment: OverflowBarAlignment.center,
       actions: [
-        if (onDelete != null)
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onDelete();
-            },
-            child: const Text('Delete'),
+        SizedBox(
+          width: double.infinity,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (onExportDa705 != null) ...[
+                FilledButton.tonal(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    await onExportDa705();
+                  },
+                  style: compactFilledStyle,
+                  child: const Text('Export to DA-705'),
+                ),
+                const SizedBox(height: 6),
+              ],
+              if (onEdit != null || onDelete != null) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (onEdit != null)
+                      IconButton(
+                        tooltip: 'Edit',
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          onEdit();
+                        },
+                        icon: const Icon(Icons.edit),
+                      ),
+                    if (onDelete != null)
+                      IconButton(
+                        tooltip: 'Delete',
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          onDelete();
+                        },
+                        color: theme.colorScheme.error,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+              ],
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: compactFilledStyle,
+                child: const Text('Close'),
+              ),
+            ],
           ),
-        if (onEdit != null)
-          FilledButton.tonal(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onEdit();
-            },
-            child: const Text('Edit'),
-          ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Close'),
         ),
       ],
     ),
