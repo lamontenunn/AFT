@@ -6,7 +6,6 @@ import 'package:aft_firebase_app/widgets/aft_pill.dart';
 import 'package:aft_firebase_app/widgets/aft_choice_chip.dart';
 import 'package:aft_firebase_app/widgets/aft_event_card.dart';
 import 'package:aft_firebase_app/widgets/aft_score_ring.dart';
-import 'package:aft_firebase_app/widgets/aft_stepper.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_inputs.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
@@ -27,7 +26,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
 /// - Context row card: Age dropdown; Sex chips; Test Date pill (no picker)
-/// - Event cards: MDL, HR Push-ups, Sprint-Drag-Carry (with inputs + steppers)
+/// - Event cards: MDL, HR Push-ups, Sprint-Drag-Carry (with inputs + sliders)
 /// Score rings and total are computed via providers + scoring service.
 class FeatureHomeScreen extends ConsumerStatefulWidget {
   const FeatureHomeScreen({super.key});
@@ -594,17 +593,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            AftStepper(
-                              value: int.tryParse(_mdlController.text) ?? 0,
-                              min: 0,
-                              step: 5,
-                              compact: true,
-                              onChanged: (v) {
-                                _mdlController.text = '$v';
-                                _onMdlChanged(_mdlController.text);
-                              },
-                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -681,17 +669,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                       horizontal: 12, vertical: 8),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            AftStepper(
-                              value: int.tryParse(_puController.text) ?? 0,
-                              min: 0,
-                              step: 1,
-                              compact: true,
-                              onChanged: (v) {
-                                _puController.text = '$v';
-                                _onPuChanged(_puController.text);
-                              },
                             ),
                           ],
                         ),
@@ -777,25 +754,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                               horizontal: 12, vertical: 8),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                AftStepper(
-                                  value: curr,
-                                  min: cfg.min.toInt(),
-                                  max: cfg.max.toInt(),
-                                  step: cfg.step.toInt(),
-                                  displayFormatter: (v) =>
-                                      slidercfg.formatMmSs(v),
-                                  semanticsLabel: 'Sprint-drag-carry time',
-                                  compact: true,
-                                  onChanged: (v) {
-                                    final clamped = v
-                                        .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                        .toInt();
-                                    _sdcController.text =
-                                        slidercfg.formatMmSs(clamped);
-                                    _onSdcChanged(_sdcController.text);
-                                  },
                                 ),
                               ],
                             );
@@ -886,25 +844,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                AftStepper(
-                                  value: curr,
-                                  min: cfg.min.toInt(),
-                                  max: cfg.max.toInt(),
-                                  step: cfg.step.toInt(),
-                                  displayFormatter: (v) =>
-                                      slidercfg.formatMmSs(v),
-                                  semanticsLabel: 'Plank time',
-                                  compact: true,
-                                  onChanged: (v) {
-                                    final clamped = v
-                                        .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                        .toInt();
-                                    _plankController.text =
-                                        slidercfg.formatMmSs(clamped);
-                                    _onPlankChanged(_plankController.text);
-                                  },
-                                ),
                               ],
                             );
                           },
@@ -992,25 +931,6 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                                               horizontal: 12, vertical: 8),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                AftStepper(
-                                  value: curr,
-                                  min: cfg.min.toInt(),
-                                  max: cfg.max.toInt(),
-                                  step: 1,
-                                  displayFormatter: (v) =>
-                                      slidercfg.formatMmSs(v),
-                                  semanticsLabel: '2-mile run time',
-                                  compact: true,
-                                  onChanged: (v) {
-                                    final clamped = v
-                                        .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                        .toInt();
-                                    _run2miController.text =
-                                        slidercfg.formatMmSs(clamped);
-                                    _onRunChanged(_run2miController.text);
-                                  },
                                 ),
                               ],
                             );

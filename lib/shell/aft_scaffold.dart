@@ -30,8 +30,8 @@ class AftScaffold extends ConsumerWidget {
     final routeName = ModalRoute.of(context)?.settings.name ?? Routes.home;
     final int currentIndex = switch (routeName) {
       Routes.home => 0,
-      Routes.standards => 1,
-      Routes.savedSets => 2,
+      Routes.savedSets => 1,
+      Routes.standards => 2,
       Routes.proctor => 3,
       Routes.settings => 4,
       _ => 0,
@@ -64,8 +64,8 @@ class AftScaffold extends ConsumerWidget {
             HapticFeedback.selectionClick();
             final nextRoute = switch (i) {
               0 => Routes.home,
-              1 => Routes.standards,
-              2 => Routes.savedSets,
+              1 => Routes.savedSets,
+              2 => Routes.standards,
               3 => Routes.proctor,
               4 => Routes.settings,
               _ => Routes.home,
@@ -79,14 +79,14 @@ class AftScaffold extends ConsumerWidget {
               label: 'Calculator',
             ),
             NavigationDestination(
-              icon: Icon(Icons.flag_outlined),
-              selectedIcon: Icon(Icons.flag),
-              label: 'Standards',
-            ),
-            NavigationDestination(
               icon: Icon(Icons.folder_outlined),
               selectedIcon: Icon(Icons.folder),
               label: 'Saved Tests',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.flag_outlined),
+              selectedIcon: Icon(Icons.flag),
+              label: 'Standards',
             ),
             NavigationDestination(
               icon: Icon(Icons.timer_outlined),
@@ -181,12 +181,14 @@ class _HomeTotalBar extends ConsumerWidget implements PreferredSizeWidget {
           children: [
             Expanded(
               child: Semantics(
-                label: 'Total score',
-                value: computed.total?.toString() ?? 'No total yet',
+                label: 'Total score out of 500',
+                value: computed.total == null
+                    ? 'No total yet'
+                    : '${computed.total} of 500',
                 child: Text(
                   computed.total == null
-                      ? 'Total: —'
-                      : 'Total: ${computed.total}',
+                      ? 'Total: — / 500'
+                      : 'Total: ${computed.total} / 500',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleLarge?.copyWith(
@@ -296,9 +298,15 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
 
     final auth = ref.watch(authStateProvider);
     final computed = ref.watch(aftComputedProvider);
+    final inputs = ref.watch(aftInputsProvider);
     final editing = ref.watch(editingSetProvider);
 
     final bool canSave = auth.isSignedIn && computed.total != null;
+    final bool hasInputs = inputs.mdlLbs != null ||
+        inputs.pushUps != null ||
+        inputs.sdc != null ||
+        inputs.plank != null ||
+        inputs.run2mi != null;
 
     Future<void> doCancel() async {
       final ok = await showDialog<bool>(
@@ -446,6 +454,40 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
       }
     }
 
+    Future<void> doClearInputs() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Clear inputs?'),
+          content: Text(
+            editing == null
+                ? 'This resets all event inputs on the calculator.'
+                : 'This resets the event inputs while you are editing. You can still cancel to restore the original.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Keep'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Clear'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+
+      FocusScope.of(context).unfocus();
+      ref.read(aftInputsProvider.notifier).clearAll();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Inputs cleared')),
+        );
+      }
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -459,6 +501,15 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
             icon: const Icon(Icons.close, size: 18),
             onPressed: doCancel,
           ),
+        IconButton(
+          tooltip: 'Clear inputs',
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+          splashRadius: 16,
+          icon: const Icon(Icons.restart_alt, size: 18),
+          onPressed: hasInputs ? doClearInputs : null,
+        ),
         IconButton(
           tooltip: auth.isSignedIn
               ? (editing != null ? 'Update saved test' : 'Save results')
