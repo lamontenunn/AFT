@@ -6,7 +6,6 @@ import 'package:aft_firebase_app/widgets/aft_pill.dart';
 import 'package:aft_firebase_app/widgets/aft_choice_chip.dart';
 import 'package:aft_firebase_app/widgets/aft_event_card.dart';
 import 'package:aft_firebase_app/widgets/aft_score_ring.dart';
-import 'package:aft_firebase_app/widgets/aft_stepper.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_inputs.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
@@ -27,7 +26,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 /// Home screen layout (first page) using Riverpod state.
 /// - Total card with right-side pass/fail box (gold outline) + Save button (auth-gated)
 /// - Context row card: Age dropdown; Sex chips; Test Date pill (no picker)
-/// - Event cards: MDL, HR Push-ups, Sprint-Drag-Carry (with inputs + steppers)
+/// - Event cards: MDL, HR Push-ups, Sprint-Drag-Carry (with inputs + sliders)
 /// Score rings and total are computed via providers + scoring service.
 class FeatureHomeScreen extends ConsumerStatefulWidget {
   const FeatureHomeScreen({super.key});

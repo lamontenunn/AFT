@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
@@ -13,6 +14,8 @@ class EditDefaultProfileScreen extends ConsumerStatefulWidget {
   ConsumerState<EditDefaultProfileScreen> createState() =>
       _EditDefaultProfileScreenState();
 }
+
+enum _HeightInputMode { feetInches, inches }
 
 class _EditDefaultProfileScreenState
     extends ConsumerState<EditDefaultProfileScreen> {
@@ -464,6 +467,10 @@ class _EditDefaultProfileScreenState
       builder: (ctx) {
         int localFt = ft;
         int localIn = inch;
+        var mode = _HeightInputMode.feetInches;
+        final inchesController =
+            TextEditingController(text: totalIn.toString());
+        String? inchesError;
         return StatefulBuilder(
           builder: (ctx, setState) => Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -480,39 +487,96 @@ class _EditDefaultProfileScreenState
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        value: localFt,
-                        decoration: const InputDecoration(
-                          labelText: 'Feet',
-                          isDense: true,
-                        ),
-                        items: List.generate(
-                          9,
-                          (i) => DropdownMenuItem(value: i, child: Text('$i')),
-                        ),
-                        onChanged: (v) => setState(() => localFt = v ?? 0),
-                      ),
+                SegmentedButton<_HeightInputMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: _HeightInputMode.feetInches,
+                      label: Text('Ft/In'),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        value: localIn,
-                        decoration: const InputDecoration(
-                          labelText: 'Inches',
-                          isDense: true,
-                        ),
-                        items: List.generate(
-                          12,
-                          (i) => DropdownMenuItem(value: i, child: Text('$i')),
-                        ),
-                        onChanged: (v) => setState(() => localIn = v ?? 0),
-                      ),
+                    ButtonSegment(
+                      value: _HeightInputMode.inches,
+                      label: Text('Inches'),
                     ),
                   ],
+                  selected: {mode},
+                  onSelectionChanged: (sel) {
+                    if (sel.isEmpty) return;
+                    final next = sel.first;
+                    if (next == mode) return;
+                    setState(() {
+                      inchesError = null;
+                      if (next == _HeightInputMode.inches) {
+                        inchesController.text =
+                            (localFt * 12 + localIn).toString();
+                      } else {
+                        final total =
+                            int.tryParse(inchesController.text.trim()) ?? 0;
+                        localFt = (total ~/ 12).clamp(0, 8);
+                        localIn = (total % 12).clamp(0, 11);
+                      }
+                      mode = next;
+                    });
+                  },
                 ),
+                const SizedBox(height: 12),
+                if (mode == _HeightInputMode.feetInches)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: localFt,
+                          decoration: const InputDecoration(
+                            labelText: 'Feet',
+                            isDense: true,
+                          ),
+                          items: List.generate(
+                            9,
+                            (i) => DropdownMenuItem(
+                              value: i,
+                              child: Text('$i'),
+                            ),
+                          ),
+                          onChanged: (v) => setState(() => localFt = v ?? 0),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: localIn,
+                          decoration: const InputDecoration(
+                            labelText: 'Inches',
+                            isDense: true,
+                          ),
+                          items: List.generate(
+                            12,
+                            (i) => DropdownMenuItem(
+                              value: i,
+                              child: Text('$i'),
+                            ),
+                          ),
+                          onChanged: (v) => setState(() => localIn = v ?? 0),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  TextField(
+                    controller: inchesController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: false),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      labelText: 'Total inches',
+                      hintText: 'e.g., 70',
+                      isDense: true,
+                      errorText: inchesError,
+                    ),
+                    onChanged: (_) {
+                      if (inchesError != null) {
+                        setState(() => inchesError = null);
+                      }
+                    },
+                  ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -527,10 +591,24 @@ class _EditDefaultProfileScreenState
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () => Navigator.of(ctx).pop(<String, int>{
-                        'ft': localFt,
-                        'in': localIn,
-                      }),
+                      onPressed: () {
+                        if (mode == _HeightInputMode.inches) {
+                          final raw = inchesController.text.trim();
+                          final inches = int.tryParse(raw);
+                          if (inches == null) {
+                            setState(
+                                () => inchesError = 'Enter total inches');
+                            return;
+                          }
+                          Navigator.of(ctx)
+                              .pop(<String, int>{'inches': inches});
+                          return;
+                        }
+                        Navigator.of(ctx).pop(<String, int>{
+                          'ft': localFt,
+                          'in': localIn,
+                        });
+                      },
                       child: const Text('Save'),
                     ),
                   ],
@@ -545,6 +623,11 @@ class _EditDefaultProfileScreenState
     if (picked == null) return;
     if (picked.isEmpty) {
       _setDraft(_draft.copyWith(clearHeight: true));
+      return;
+    }
+    final inches = picked['inches'];
+    if (inches != null) {
+      _setDraft(_draft.copyWith(height: inches.toDouble()));
       return;
     }
     final selFt = picked['ft'] ?? 0;
