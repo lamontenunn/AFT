@@ -24,6 +24,19 @@ String formatMmSs(Duration d) {
   return '${mm.toString()}:${ss.toString().padLeft(2, '0')}';
 }
 
+/// Formats a Duration as m:ss.SS (minutes not padded; seconds/hundredths padded).
+/// Example: 3:05.12, 12:34.00
+String formatMmSsMillis(Duration d) {
+  final isNegative = d.isNegative;
+  final totalMs = d.inMilliseconds.abs();
+  final mm = totalMs ~/ Duration.millisecondsPerMinute;
+  final ss = (totalMs ~/ 1000) % 60;
+  final hundredths = (totalMs % 1000) ~/ 10;
+  final formatted =
+      '${mm.toString()}:${ss.toString().padLeft(2, '0')}.${hundredths.toString().padLeft(2, '0')}';
+  return isNegative ? '-$formatted' : formatted;
+}
+
 /// Basic time input formatter for m:ss and mm:ss.
 /// - Only digits are accepted.
 /// - Digits are interpreted as:

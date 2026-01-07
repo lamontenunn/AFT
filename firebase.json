@@ -6,6 +6,13 @@
           "projectId": "aft-firebase-app-1760071390",
           "appId": "1:109820847091:android:e992649ee0b026bc65a886",
           "fileOutput": "android/app/google-services.json"
+        },
+        "buildConfigurations": {
+          ".": {
+            "projectId": "aft-firebase-app-1760071390",
+            "appId": "1:109820847091:android:0853ad7c5a63fa4b65a886",
+            "fileOutput": "android/app/google-services.json"
+          }
         }
       },
       "ios": {
@@ -14,6 +21,26 @@
           "appId": "1:109820847091:ios:e3f686da70448e6765a886",
           "uploadDebugSymbols": false,
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        },
+        "buildConfigurations": {
+          "Debug": {
+            "projectId": "aft-firebase-app-1760071390",
+            "appId": "1:109820847091:ios:9579a66742a6a7a565a886",
+            "uploadDebugSymbols": false,
+            "fileOutput": "ios/Runner/GoogleService-Info.plist"
+          },
+          "Release": {
+            "projectId": "aft-firebase-app-1760071390",
+            "appId": "1:109820847091:ios:9579a66742a6a7a565a886",
+            "uploadDebugSymbols": false,
+            "fileOutput": "ios/Runner/GoogleService-Info.plist"
+          },
+          "Profile": {
+            "projectId": "aft-firebase-app-1760071390",
+            "appId": "1:109820847091:ios:9579a66742a6a7a565a886",
+            "uploadDebugSymbols": false,
+            "fileOutput": "ios/Runner/GoogleService-Info.plist"
+          }
         }
       },
       "macos": {
@@ -28,7 +55,8 @@
         "lib/firebase_options.dart": {
           "projectId": "aft-firebase-app-1760071390",
           "configurations": {
-            "ios": "1:109820847091:ios:e3f686da70448e6765a886"
+            "android": "1:109820847091:android:0853ad7c5a63fa4b65a886",
+            "ios": "1:109820847091:ios:9579a66742a6a7a565a886"
           }
         }
       }
@@ -36,5 +64,39 @@
   },
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
   }
 }

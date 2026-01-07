@@ -13,6 +13,7 @@ import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
+import 'package:aft_firebase_app/features/aft/utils/sdc_segment_info.dart';
 import 'package:aft_firebase_app/features/aft/logic/slider_config.dart'
     as slidercfg;
 import 'package:aft_firebase_app/widgets/aft_event_slider.dart';
@@ -558,44 +559,25 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _mdlController,
-                          focusNode: _mdlFocus,
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (_) =>
-                              FocusScope.of(context).requestFocus(_puFocus),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          onChanged: _onMdlChanged,
-                          scrollPadding: const EdgeInsets.only(bottom: 80),
-                          decoration: InputDecoration(
-                            labelText: 'MDL weight',
-                            hintText: 'e.g., 185',
-                            errorText: _mdlError,
-                            suffixText: 'lbs',
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      AftStepper(
-                        value: int.tryParse(_mdlController.text) ?? 0,
-                        min: 0,
-                        step: 5,
-                        compact: true,
-                        onChanged: (v) {
-                          _mdlController.text = '$v';
-                          _onMdlChanged(_mdlController.text);
-                        },
-                      ),
-                    ],
+                  TextField(
+                    controller: _mdlController,
+                    focusNode: _mdlFocus,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) =>
+                        FocusScope.of(context).requestFocus(_puFocus),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: _onMdlChanged,
+                    scrollPadding: const EdgeInsets.only(bottom: 80),
+                    decoration: InputDecoration(
+                      labelText: 'MDL weight',
+                      hintText: 'e.g., 185',
+                      errorText: _mdlError,
+                      suffixText: 'lbs',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Builder(
@@ -646,43 +628,24 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _puController,
-                          focusNode: _puFocus,
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (_) =>
-                              FocusScope.of(context).requestFocus(_sdcFocus),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          onChanged: _onPuChanged,
-                          scrollPadding: const EdgeInsets.only(bottom: 80),
-                          decoration: InputDecoration(
-                            labelText: 'Push-ups',
-                            hintText: 'e.g., 30',
-                            errorText: _puError,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      AftStepper(
-                        value: int.tryParse(_puController.text) ?? 0,
-                        min: 0,
-                        step: 1,
-                        compact: true,
-                        onChanged: (v) {
-                          _puController.text = '$v';
-                          _onPuChanged(_puController.text);
-                        },
-                      ),
-                    ],
+                  TextField(
+                    controller: _puController,
+                    focusNode: _puFocus,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) =>
+                        FocusScope.of(context).requestFocus(_sdcFocus),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: _onPuChanged,
+                    scrollPadding: const EdgeInsets.only(bottom: 80),
+                    decoration: InputDecoration(
+                      labelText: 'Push-ups',
+                      hintText: 'e.g., 30',
+                      errorText: _puError,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Builder(
@@ -718,6 +681,18 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
             // Sprint-Drag-Carry card
             AftEventCard(
               title: 'Sprint-Drag-Carry',
+              titleTrailing: IconButton(
+                tooltip: 'SDC segment targets',
+                onPressed: () => showSdcSegmentInfoSheet(context, profile),
+                iconSize: 16,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                icon: Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
               icon: Icons.timer_outlined,
               compact: true,
               leading: const AftSvgIcon(
@@ -732,59 +707,24 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.sdc);
-                      final sec = inputs.sdc?.inSeconds ??
-                          parseMmSs(_sdcController.text)?.inSeconds ??
-                          cfg.max.toInt();
-                      final curr =
-                          sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _sdcController,
-                              focusNode: _sdcFocus,
-                              textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => FocusScope.of(context)
-                                  .requestFocus(_plankFocus),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [MmSsFormatter()],
-                              onChanged: _onSdcChanged,
-                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                              decoration: InputDecoration(
-                                labelText: 'Sprint-Drag-Carry time',
-                                hintText: 'e.g., 1:45',
-                                errorText: _sdcError,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          AftStepper(
-                            value: curr,
-                            min: cfg.min.toInt(),
-                            max: cfg.max.toInt(),
-                            step: cfg.step.toInt(),
-                            displayFormatter: (v) => slidercfg.formatMmSs(v),
-                            semanticsLabel: 'Sprint-drag-carry time',
-                            compact: true,
-                            onChanged: (v) {
-                              final clamped = v
-                                  .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                  .toInt();
-                              _sdcController.text =
-                                  slidercfg.formatMmSs(clamped);
-                              _onSdcChanged(_sdcController.text);
-                            },
-                          ),
-                        ],
-                      );
-                    },
+                  TextField(
+                    controller: _sdcController,
+                    focusNode: _sdcFocus,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) =>
+                        FocusScope.of(context).requestFocus(_plankFocus),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [MmSsFormatter()],
+                    onChanged: _onSdcChanged,
+                    scrollPadding: const EdgeInsets.only(bottom: 80),
+                    decoration: InputDecoration(
+                      labelText: 'Sprint-Drag-Carry time',
+                      hintText: 'e.g., 1:45',
+                      errorText: _sdcError,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Builder(
@@ -834,59 +774,24 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.plank);
-                      final sec = inputs.plank?.inSeconds ??
-                          parseMmSs(_plankController.text)?.inSeconds ??
-                          cfg.min.toInt();
-                      final curr =
-                          sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _plankController,
-                              focusNode: _plankFocus,
-                              textInputAction: TextInputAction.next,
-                              onSubmitted: (_) => FocusScope.of(context)
-                                  .requestFocus(_runFocus),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [MmSsFormatter()],
-                              onChanged: _onPlankChanged,
-                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                              decoration: InputDecoration(
-                                labelText: 'Plank time',
-                                hintText: 'e.g., 2:10',
-                                errorText: _plankError,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          AftStepper(
-                            value: curr,
-                            min: cfg.min.toInt(),
-                            max: cfg.max.toInt(),
-                            step: cfg.step.toInt(),
-                            displayFormatter: (v) => slidercfg.formatMmSs(v),
-                            semanticsLabel: 'Plank time',
-                            compact: true,
-                            onChanged: (v) {
-                              final clamped = v
-                                  .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                  .toInt();
-                              _plankController.text =
-                                  slidercfg.formatMmSs(clamped);
-                              _onPlankChanged(_plankController.text);
-                            },
-                          ),
-                        ],
-                      );
-                    },
+                  TextField(
+                    controller: _plankController,
+                    focusNode: _plankFocus,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) =>
+                        FocusScope.of(context).requestFocus(_runFocus),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [MmSsFormatter()],
+                    onChanged: _onPlankChanged,
+                    scrollPadding: const EdgeInsets.only(bottom: 80),
+                    decoration: InputDecoration(
+                      labelText: 'Plank time',
+                      hintText: 'e.g., 2:10',
+                      errorText: _plankError,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Builder(
@@ -936,59 +841,23 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Builder(
-                    builder: (context) {
-                      final cfg = slidercfg.getSliderConfig(
-                          profile.standard, profile, AftEvent.run2mi);
-                      final sec = inputs.run2mi?.inSeconds ??
-                          parseMmSs(_run2miController.text)?.inSeconds ??
-                          cfg.max.toInt();
-                      final curr =
-                          sec.clamp(cfg.min.toInt(), cfg.max.toInt()).toInt();
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _run2miController,
-                              focusNode: _runFocus,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) =>
-                                  FocusScope.of(context).unfocus(),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [MmSsFormatter()],
-                              onChanged: _onRunChanged,
-                              scrollPadding: const EdgeInsets.only(bottom: 80),
-                              decoration: InputDecoration(
-                                labelText: '2-Mile Run time',
-                                hintText: 'e.g., 16:45',
-                                errorText: _run2miError,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          AftStepper(
-                            value: curr,
-                            min: cfg.min.toInt(),
-                            max: cfg.max.toInt(),
-                            step: 1,
-                            displayFormatter: (v) => slidercfg.formatMmSs(v),
-                            semanticsLabel: '2-mile run time',
-                            compact: true,
-                            onChanged: (v) {
-                              final clamped = v
-                                  .clamp(cfg.min.toInt(), cfg.max.toInt())
-                                  .toInt();
-                              _run2miController.text =
-                                  slidercfg.formatMmSs(clamped);
-                              _onRunChanged(_run2miController.text);
-                            },
-                          ),
-                        ],
-                      );
-                    },
+                  TextField(
+                    controller: _run2miController,
+                    focusNode: _runFocus,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [MmSsFormatter()],
+                    onChanged: _onRunChanged,
+                    scrollPadding: const EdgeInsets.only(bottom: 80),
+                    decoration: InputDecoration(
+                      labelText: '2-Mile Run time',
+                      hintText: 'e.g., 16:45',
+                      errorText: _run2miError,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Builder(

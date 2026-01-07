@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
+import 'package:aft_firebase_app/features/aft/utils/sdc_segment_info.dart';
 import 'package:aft_firebase_app/features/aft/logic/scoring_service.dart'
     show AftEvent;
 import 'package:aft_firebase_app/features/proctor/state/proctor_session.dart';
@@ -637,7 +638,6 @@ class _TimingTab extends ConsumerWidget {
         body: 'Select a participant to start timing.',
       );
     }
-
     final segments = const [
       ButtonSegment(value: AftEvent.sdc, label: Text('SDC')),
       ButtonSegment(value: AftEvent.plank, label: Text('PLK')),
@@ -676,6 +676,26 @@ class _TimingTab extends ConsumerWidget {
             event: event,
           ),
       ],
+    );
+  }
+}
+
+class _SdcInfoButton extends StatelessWidget {
+  const _SdcInfoButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    return IconButton(
+      tooltip: 'SDC segment targets',
+      onPressed: onPressed,
+      iconSize: 16,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+      icon: Icon(Icons.info_outline, color: color),
     );
   }
 }
@@ -1094,7 +1114,7 @@ class _SdcPaceTimeline extends StatelessWidget {
               ),
             ),
             Text(
-              'Current: ${formatMmSs(currentElapsed)}',
+              'Current: ${formatMmSsMillis(currentElapsed)}',
               style: theme.textTheme.labelLarge
                   ?.copyWith(fontWeight: FontWeight.w900),
             ),
@@ -1102,7 +1122,7 @@ class _SdcPaceTimeline extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'Segment time: ${formatMmSs(segmentElapsed)}',
+          'Segment time: ${formatMmSsMillis(segmentElapsed)}',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w700,
@@ -1257,38 +1277,9 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Saved ${widget.title}: ${formatMmSs(elapsed)}')),
-    );
-  }
-
-  static const List<String> _sdcSegments = <String>[
-    'Sprint',
-    'Drag',
-    'Lateral',
-    'Carry',
-    'Final Sprint',
-  ];
-  // Relative time weights per segment (order matches _sdcSegments).
-  static const List<double> _sdcSegmentWeights = <double>[
-    18,
-    24,
-    18,
-    24,
-    16,
-  ];
-
-  Duration _sdcCumulativeTarget(Duration total, int segmentIndex) {
-    final clamped =
-        segmentIndex.clamp(0, _sdcSegmentWeights.length - 1).toInt();
-    final weightTotal = _sdcSegmentWeights.fold<double>(0, (sum, w) => sum + w);
-    if (weightTotal <= 0) return total;
-    double cumulative = 0;
-    for (var i = 0; i <= clamped; i++) {
-      cumulative += _sdcSegmentWeights[i];
-    }
-    final fraction = cumulative / weightTotal;
-    return Duration(
-      milliseconds: (total.inMilliseconds * fraction).round(),
+      SnackBar(
+        content: Text('Saved ${widget.title}: ${formatMmSsMillis(elapsed)}'),
+      ),
     );
   }
 
@@ -1301,9 +1292,9 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
     // 2 => Carry
     // 3 => Final Sprint
     // 4 => Finish
-    if (lapCount >= _sdcSegments.length - 1) return 'Finish';
-    if (lapCount == 0) return _sdcSegments[1];
-    return _sdcSegments[lapCount + 1];
+    if (lapCount >= kSdcSegments.length - 1) return 'Finish';
+    if (lapCount == 0) return kSdcSegments[1];
+    return kSdcSegments[lapCount + 1];
   }
 
   void _resetSelected(BuildContext context) {
@@ -1358,12 +1349,12 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
         : null;
     final sdcTarget60 =
         widget.event == AftEvent.sdc ? _parseDurationThreshold(th.pts60) : null;
-    final sdcSegmentCount = _sdcSegments.length;
+    final sdcSegmentCount = kSdcSegments.length;
     final sdcLapCount = swState.lapsCumulative.length;
     final sdcSegmentIndex = widget.event == AftEvent.sdc
         ? (sdcLapCount >= sdcSegmentCount ? sdcSegmentCount - 1 : sdcLapCount)
         : 0;
-    final sdcSegmentLabel = _sdcSegments[sdcSegmentIndex];
+    final sdcSegmentLabel = kSdcSegments[sdcSegmentIndex];
     final sdcSegmentStartIndex = sdcSegmentIndex - 1;
     final sdcSegmentStart = (sdcSegmentStartIndex >= 0 &&
             sdcSegmentStartIndex < swState.lapsCumulative.length)
@@ -1373,10 +1364,10 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
         elapsed >= sdcSegmentStart ? elapsed - sdcSegmentStart : Duration.zero;
     final sdcCumulativeTarget60 = sdcTarget60 == null
         ? null
-        : _sdcCumulativeTarget(sdcTarget60, sdcSegmentIndex);
+        : sdcCumulativeTarget(sdcTarget60, sdcSegmentIndex);
     final sdcCumulativeTarget100 = sdcTarget100 == null
         ? null
-        : _sdcCumulativeTarget(sdcTarget100, sdcSegmentIndex);
+        : sdcCumulativeTarget(sdcTarget100, sdcSegmentIndex);
     final sdcPaceAvailable =
         sdcCumulativeTarget100 != null && sdcCumulativeTarget60 != null;
     final sdcOnTrack100 = sdcCumulativeTarget100 == null
@@ -1415,12 +1406,26 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    widget.title,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.title,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      if (widget.event == AftEvent.sdc) ...[
+                        const SizedBox(width: 6),
+                        _SdcInfoButton(
+                          onPressed: () =>
+                              showSdcSegmentInfoSheet(context, profile),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 if (score != null)
@@ -1444,7 +1449,7 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
             const SizedBox(height: 10),
             Center(
               child: Text(
-                formatMmSs(elapsed),
+                formatMmSsMillis(elapsed),
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -1563,7 +1568,7 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
                         ),
                       ),
                       Text(
-                        formatMmSs(lap.split),
+                        formatMmSsMillis(lap.split),
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
@@ -1571,7 +1576,7 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        formatMmSs(lap.cumulative),
+                        formatMmSsMillis(lap.cumulative),
                         style: Theme.of(context)
                             .textTheme
                             .bodyMedium
@@ -1619,14 +1624,9 @@ List<_LapEntry> _deriveLapEntries(AftEvent event, List<Duration> cumulative) {
 
 String _lapLabelFor(AftEvent event, int index) {
   if (event == AftEvent.sdc) {
-    const labels = <String>[
-      'Sprint',
-      'Drag',
-      'Lateral',
-      'Carry',
-      'Final Sprint',
-    ];
-    return index < labels.length ? labels[index] : 'Lap ${index + 1}';
+    return index < kSdcSegments.length
+        ? kSdcSegments[index]
+        : 'Lap ${index + 1}';
   }
   // 2MR
   return 'Lap ${index + 1}';

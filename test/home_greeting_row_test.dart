@@ -1,28 +1,20 @@
 import 'package:aft_firebase_app/features/home/home_screen.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
       'Calculator greeting row shows only when lastName and rankAbbrev are set and supported',
       (tester) async {
-    final container = ProviderContainer(
-      overrides: [
-        settingsProvider.overrideWith((ref) {
-          // Stub controller with deterministic state.
-          return _TestSettingsController(
-            SettingsState.defaults.copyWith(
-              defaultProfile: DefaultProfileSettings.defaults.copyWith(
-                lastName: 'Nunn',
-                rankAbbrev: 'SGT',
-              ),
-            ),
-          );
-        }),
-      ],
+    final container = _containerWithProfile(
+      DefaultProfileSettings.defaults.copyWith(
+        lastName: 'Nunn',
+        rankAbbrev: 'SGT',
+      ),
     );
+    addTearDown(container.dispose);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -38,20 +30,13 @@ void main() {
 
   testWidgets('Calculator greeting row hides for truly unknown rank abbrev',
       (tester) async {
-    final container = ProviderContainer(
-      overrides: [
-        settingsProvider.overrideWith((ref) {
-          return _TestSettingsController(
-            SettingsState.defaults.copyWith(
-              defaultProfile: DefaultProfileSettings.defaults.copyWith(
-                lastName: 'Nunn',
-                rankAbbrev: 'ZZZ', // truly unknown
-              ),
-            ),
-          );
-        }),
-      ],
+    final container = _containerWithProfile(
+      DefaultProfileSettings.defaults.copyWith(
+        lastName: 'Nunn',
+        rankAbbrev: 'ZZZ', // truly unknown
+      ),
     );
+    addTearDown(container.dispose);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -68,21 +53,14 @@ void main() {
   testWidgets(
       'Calculator greeting row uses payGrade as fallback for rank (O-1 -> 2LT)',
       (tester) async {
-    final container = ProviderContainer(
-      overrides: [
-        settingsProvider.overrideWith((ref) {
-          return _TestSettingsController(
-            SettingsState.defaults.copyWith(
-              defaultProfile: DefaultProfileSettings.defaults.copyWith(
-                lastName: 'Nunn',
-                payGrade: 'O-1',
-                // rankAbbrev intentionally unset
-              ),
-            ),
-          );
-        }),
-      ],
+    final container = _containerWithProfile(
+      DefaultProfileSettings.defaults.copyWith(
+        lastName: 'Nunn',
+        payGrade: 'O-1',
+        // rankAbbrev intentionally unset
+      ),
     );
+    addTearDown(container.dispose);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -97,47 +75,19 @@ void main() {
   });
 }
 
-class _TestSettingsController extends SettingsController {
-  _TestSettingsController(SettingsState seed) : super(_fakeRef) {
-    state = seed;
-  }
-
-  @override
-  Future<void> setDefaultProfile(
-    DefaultProfileSettings profile, {
-    DateTime? updatedAt,
-    bool syncRemote = true,
-  }) async {
-    state = state.copyWith(defaultProfile: profile);
-  }
-}
-
-final _fakeRef = _FakeRef();
-
-// Minimal fake Ref so SettingsController constructor can run; we bypass _load.
-class _FakeRef implements Ref {
-  @override
-  ProviderSubscription<T> listen<T>(
-    ProviderListenable<T> provider,
-    void Function(T? previous, T next) listener, {
-    void Function(Object, StackTrace)? onError,
-    bool? fireImmediately,
-  }) {
-    return _NoopSubscription<T>(_container);
-  }
-
-  @override
-  T read<T>(ProviderListenable<T> provider) => _container.read(provider);
-
-  final ProviderContainer _container = ProviderContainer();
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _NoopSubscription<T> extends ProviderSubscription<T> {
-  _NoopSubscription(ProviderContainer source) : super(source);
-
-  @override
-  T read() => throw UnimplementedError();
+ProviderContainer _containerWithProfile(DefaultProfileSettings profile) {
+  return ProviderContainer(
+    overrides: [
+      settingsProvider.overrideWith((ref) {
+        return SettingsController(
+          ref,
+          initialState: SettingsState.defaults.copyWith(
+            defaultProfile: profile,
+          ),
+          loadOnInit: false,
+          listenToAuthChanges: false,
+        );
+      }),
+    ],
+  );
 }

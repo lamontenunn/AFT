@@ -25,6 +25,24 @@ class PlateMathResult {
   }
 }
 
+/// Formats a per-side plate list as "45 lb x2 + 25 lb + 10 lb x2".
+String formatPlatesPerSide(List<int> plates) {
+  if (plates.isEmpty) return 'None';
+  final counts = <int, int>{};
+  final order = <int>[];
+  for (final p in plates) {
+    if (!counts.containsKey(p)) order.add(p);
+    counts[p] = (counts[p] ?? 0) + 1;
+  }
+  final parts = <String>[];
+  for (final p in order) {
+    final count = counts[p] ?? 0;
+    final suffix = count > 1 ? ' x$count' : '';
+    parts.add('$p lb$suffix');
+  }
+  return parts.join(' + ');
+}
+
 /// Plate math helper.
 ///
 /// Assumptions for this app:

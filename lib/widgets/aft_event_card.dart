@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 /// Generic event card with:
 /// - leading icon
 /// - title
+/// - optional title trailing widget (e.g., info button)
 /// - trailing widget (e.g., score ring)
 /// - child content area (e.g., input fields)
 class AftEventCard extends StatelessWidget {
@@ -14,12 +15,14 @@ class AftEventCard extends StatelessWidget {
     this.trailing,
     this.leading,
     this.compact = false,
+    this.titleTrailing,
   });
 
   final String title;
   final IconData icon;
   final Widget child;
   final Widget? trailing;
+  final Widget? titleTrailing;
 
   /// Optional custom leading widget (e.g., SVG). If provided, supersedes [icon].
   final Widget? leading;
@@ -65,9 +68,21 @@ class AftEventCard extends StatelessWidget {
                 ),
                 SizedBox(width: compact ? 6 : 8),
                 Expanded(
-                  child: Text(
-                    title,
-                    style: textStyle,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          overflow: TextOverflow.ellipsis,
+                          style: textStyle,
+                        ),
+                      ),
+                      if (titleTrailing != null) ...[
+                        SizedBox(width: compact ? 4 : 6),
+                        titleTrailing!,
+                      ],
+                    ],
                   ),
                 ),
                 if (trailing != null) trailing!,

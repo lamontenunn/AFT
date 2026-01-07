@@ -163,17 +163,24 @@ class SettingsState {
 }
 
 class SettingsController extends StateNotifier<SettingsState> {
-  SettingsController(this._ref) : super(SettingsState.defaults) {
-    _loadFuture = _load();
-    _ref.listen<AsyncValue<User?>>(
-      firebaseUserProvider,
-      (previous, next) {
-        final auth = _ref.read(firebaseAuthProvider);
-        final user = next.asData?.value ?? auth?.currentUser;
-        _handleAuthChange(user);
-      },
-      fireImmediately: true,
-    );
+  SettingsController(
+    this._ref, {
+    SettingsState? initialState,
+    bool loadOnInit = true,
+    bool listenToAuthChanges = true,
+  }) : super(initialState ?? SettingsState.defaults) {
+    _loadFuture = loadOnInit ? _load() : Future.value();
+    if (listenToAuthChanges) {
+      _ref.listen<AsyncValue<User?>>(
+        firebaseUserProvider,
+        (previous, next) {
+          final auth = _ref.read(firebaseAuthProvider);
+          final user = next.asData?.value ?? auth?.currentUser;
+          _handleAuthChange(user);
+        },
+        fireImmediately: true,
+      );
+    }
   }
 
   late final Future<void> _loadFuture;

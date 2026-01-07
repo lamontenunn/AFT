@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';

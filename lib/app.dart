@@ -26,6 +26,7 @@ class _AppState extends ConsumerState<App> {
   @override
   void initState() {
     super.initState();
+    _cacheInitialResetCode();
     _initAppLinks();
   }
 
@@ -43,6 +44,17 @@ class _AppState extends ConsumerState<App> {
       }
       _linkSub = _appLinks.uriLinkStream.listen(_handleIncomingLink);
     } catch (_) {}
+  }
+
+  void _cacheInitialResetCode() {
+    final routeName =
+        WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+    final uri = Uri.tryParse(routeName);
+    if (uri == null) return;
+    final code = PasswordResetLinks.extractOobCode(uri);
+    if (code != null) {
+      _lastResetCode = code;
+    }
   }
 
   void _handleIncomingLink(Uri link) {

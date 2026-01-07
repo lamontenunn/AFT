@@ -116,7 +116,7 @@
   63 |     messagingSenderId: '109820847091',
   64 |     projectId: 'aft-firebase-app-1760071390',
   65 |     storageBucket: 'aft-firebase-app-1760071390.firebasestorage.app',
-  66 |     iosBundleId: 'com.lamontenunn.aftApp',
+  66 |     iosBundleId: 'com.lamontenunn.aftpro',
   67 |   );
   68 |
   69 |   static const FirebaseOptions macos = FirebaseOptions(
@@ -125,7 +125,7 @@
   72 |     messagingSenderId: '109820847091',
   73 |     projectId: 'aft-firebase-app-1760071390',
   74 |     storageBucket: 'aft-firebase-app-1760071390.firebasestorage.app',
-  75 |     iosBundleId: 'com.example.aftFirebaseApp',
+  75 |     iosBundleId: 'com.lamontenunn.aftpro',
   76 |   );
   77 |
   78 |   static const FirebaseOptions windows = FirebaseOptions(

@@ -5,6 +5,8 @@ import 'package:aft_firebase_app/screens/standards_screen.dart';
 import 'package:aft_firebase_app/features/saves/saved_sets_screen.dart';
 import 'package:aft_firebase_app/features/auth/sign_in_page.dart';
 import 'package:aft_firebase_app/features/auth/auth_gate.dart';
+import 'package:aft_firebase_app/features/auth/password_reset_links.dart';
+import 'package:aft_firebase_app/features/auth/reset_password_screen.dart';
 import 'package:aft_firebase_app/screens/settings_screen.dart';
 import 'package:aft_firebase_app/features/proctor/proctor_screen.dart';
 
@@ -19,6 +21,25 @@ class Routes {
 
 class AppRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+    final name = settings.name;
+    if (name != null) {
+      final uri = Uri.tryParse(name);
+      if (uri != null) {
+        final isResetPath =
+            uri.path == PasswordResetLinks.resetPath ||
+            uri.path.startsWith('/__/auth/');
+        if (isResetPath) {
+          final code = PasswordResetLinks.extractOobCode(uri);
+          if (code != null) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (context) => ResetPasswordScreen(oobCode: code),
+            );
+          }
+        }
+      }
+    }
+
     switch (settings.name) {
       case Routes.home:
         return PageRouteBuilder(

@@ -12,7 +12,12 @@
           "package_name": "com.example.aft_firebase_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "109820847091-7d4antiec3gj5ccs13f6c4a65opbeckf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC0CzPojuDi5_5eEkzNHANg89S7oQgi3Ew"
@@ -20,7 +25,63 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "109820847091-7d4antiec3gj5ccs13f6c4a65opbeckf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "109820847091-8d8a5cvrgui0atplb7dkm26iak7bvv89.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.aftFirebaseApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:109820847091:android:0853ad7c5a63fa4b65a886",
+        "android_client_info": {
+          "package_name": "com.lamontenunn.aftpro"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "109820847091-vbadn3l0o6698l320s3sbigjgpt8ukv0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lamontenunn.aftpro",
+            "certificate_hash": "a7945d06172d625a94eabb1126e9a5703a938e85"
+          }
+        },
+        {
+          "client_id": "109820847091-7d4antiec3gj5ccs13f6c4a65opbeckf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0CzPojuDi5_5eEkzNHANg89S7oQgi3Ew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "109820847091-7d4antiec3gj5ccs13f6c4a65opbeckf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "109820847091-8d8a5cvrgui0atplb7dkm26iak7bvv89.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.aftFirebaseApp"
+              }
+            }
+          ]
         }
       }
     }

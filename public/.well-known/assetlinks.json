@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lamontenunn.aftpro",
+      "sha256_cert_fingerprints": [
+        "09:58:AA:B4:B9:A5:C4:84:C4:BC:48:E8:81:66:77:6A:5C:DD:59:BB:EA:66:7E:9C:4B:ED:42:3F:E2:C2:7E:6B"
+      ]
+    }
+  }
+]
