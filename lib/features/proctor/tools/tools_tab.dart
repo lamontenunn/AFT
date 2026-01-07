@@ -129,7 +129,10 @@ class _ToolsIconSelector extends StatelessWidget {
             'assets/icons/h-w.svg',
             size: 28,
             padding: const EdgeInsets.all(0),
-            colorFilter: null,
+            colorFilter: ColorFilter.mode(
+              selectedIndex == 2 ? Colors.black : theme.colorScheme.onSurface,
+              BlendMode.srcIn,
+            ),
           ),
         ),
       ],
@@ -505,6 +508,26 @@ class _PlateMathCardState extends State<_PlateMathCard> {
                 ),
               if (res.isExact && _exactCombos.length > 1) ...[
                 const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.shuffle,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Multiple exact combos available. Tap shuffle to cycle.',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(

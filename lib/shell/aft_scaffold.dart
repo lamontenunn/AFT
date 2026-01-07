@@ -85,8 +85,8 @@ class AftScaffold extends ConsumerWidget {
               label: 'Saved Tests',
             ),
             NavigationDestination(
-              icon: Icon(Icons.flag_outlined),
-              selectedIcon: Icon(Icons.flag),
+              icon: Icon(Icons.rule_outlined),
+              selectedIcon: Icon(Icons.rule),
               label: 'Standards',
             ),
             NavigationDestination(
@@ -537,7 +537,7 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
           visualDensity: VisualDensity.compact,
           constraints: const BoxConstraints.tightFor(width: 30, height: 30),
           splashRadius: 16,
-          icon: const Icon(Icons.save_outlined, size: 18),
+          icon: const Icon(Icons.bookmark_add_outlined, size: 18),
           onPressed: canSave ? doSaveOrUpdate : null,
         ),
       ],

@@ -66,7 +66,7 @@ Future<_Da705WarnChoice?> _maybeConfirmDa705Export(
   }
   final choice = await showDialog<_Da705WarnChoice>(
     context: context,
-    barrierDismissible: false,
+    barrierDismissible: true,
     builder: (ctx) => AlertDialog(
       title: const Text('Export to DA Form 705'),
       content: Column(

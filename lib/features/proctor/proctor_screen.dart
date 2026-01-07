@@ -1510,21 +1510,23 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
                     child: const Text('Stop'),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonal(
-                    onPressed: canLap
-                        ? () => timingCtrl.lapStopwatch(
-                              participantId: selected.id,
-                              event: widget.event,
-                              cap: cap,
-                              autoStopOnCapReached:
-                                  widget.event == AftEvent.sdc,
-                            )
-                        : null,
-                    child: Text(lapLabel),
+                if (widget.event != AftEvent.plank) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: canLap
+                          ? () => timingCtrl.lapStopwatch(
+                                participantId: selected.id,
+                                event: widget.event,
+                                cap: cap,
+                                autoStopOnCapReached:
+                                    widget.event == AftEvent.sdc,
+                              )
+                          : null,
+                      child: Text(lapLabel),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
