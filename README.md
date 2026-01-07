@@ -3,7 +3,9 @@
 This repo contains a multi-platform Flutter app for Army Fitness Test (AFT) scoring and proctoring utilities.
 It is built for **internal/team**
 
-**Tech:** Flutter (3.22+), Dart (3.5+), Riverpod (Notifier API), Firebase Auth, SharedPreferences.
+**Tech:** Flutter (3.22+), Dart (3.5+), flutter_riverpod 3.x (Notifier + legacy StateNotifier),
+Firebase Auth + Firestore, App Links, Sign in with Apple, Google Sign-In, SharedPreferences,
+Syncfusion PDF.
 
 ---
 
@@ -43,15 +45,23 @@ Additional docs:
 
 - Contains tools that assist a proctor during execution (timers, calculators, and utilities).
 
+### Standards
+
+- Displays event thresholds for a selected age band + sex.
+- Combat toggle forces male thresholds for standards view.
+
 ### Account / Saves
 
+- Email/password, Google, and Apple sign-in (Apple available on iOS/macOS).
 - Anonymous sign-in supported.
 - Guest data can be migrated into a real user bucket on first non-anonymous sign-in.
+- Signed-out users cannot access saved tests; guests stay local-only; signed-in users sync via Firestore.
 - Saved tests can be exported to DA Form 705 (page 1) using profile defaults when available.
+  Export uses Syncfusion PDF + Share Plus.
 
 ### Settings
 
-- Defaults (profile prefill), navigation behavior, haptics.
+- Defaults (profile prefill), theme, haptics, combat info toggle.
 
 ---
 
@@ -96,6 +106,23 @@ Relevant dependencies:
 
 - `firebase_core`
 - `firebase_auth`
+- `cloud_firestore`
+- `app_links`
+- `sign_in_with_apple`
+- `google_sign_in`
+
+Auth provider configuration:
+
+- Apple sign-in requires the App ID capability + Service ID key configured in Firebase Auth,
+  and `ios/Runner/Runner.entitlements` includes the `com.apple.developer.applesignin` entitlement.
+- Google sign-in uses the iOS reversed client ID in `ios/Runner/Info.plist`.
+- Password reset links are handled by `app_links` and the `/__/auth/` routes.
+
+Hosting (app links / domain association):
+
+- `.well-known` files live under `public/.well-known/` and are deployed via Firebase Hosting.
+- Currently used: `apple-app-site-association`, `assetlinks.json`.
+- Optional: `apple-developer-domain-association.txt` (if a checker expects it).
 
 ### Local emulation (optional)
 
@@ -122,12 +149,18 @@ lib/
     proctor/                  # proctor tools & timing
     auth/                     # AuthGate + sign-in
     saves/                    # saved sets UI + migration
+    standards/                # standards table helpers
+  screens/                    # top-level screens (settings, standards, etc.)
   state/                      # global-ish settings/app state
   theme/                      # Army theme + colors
   widgets/                    # reusable UI components
 assets/
   icons/                      # SVG icons
   icons/ranks/                # rank insignia SVGs
+  forms/                      # DA 705 template assets
+  onboarding/                 # login showcase assets
+public/
+  .well-known/                # app link / domain association files (hosting)
 test/
   ...                         # unit + widget tests
 ```
@@ -141,9 +174,11 @@ test/
 `lib/main.dart` (high-level flow):
 
 1. Flutter bindings
-2. Firebase initialization
-3. Preload scoring tables
-4. `ProviderScope(...)`
+2. Lock orientation to portrait
+3. Firebase initialization
+4. Preload scoring tables
+5. `ProviderScope(...)`
+6. App links are handled in `lib/app.dart` for password reset routing
 
 ### Routing
 
@@ -175,6 +210,7 @@ Settings:
 
 - `lib/state/settings_state.dart`
 - `lib/screens/settings_screen.dart`
+- `settingsProvider` uses legacy `StateNotifierProvider` (riverpod 3.x legacy API)
 
 ---
 
@@ -188,6 +224,7 @@ Repository layer:
 - `lib/data/repository_providers.dart`
 
 Signed-in users sync saved sets across devices via Firestore.
+Guests store locally (SharedPreferences), and signed-out users do not store saved sets.
 Default profile settings sync to `users/{uid}` under `defaultProfile`.
 
 ### Saved model
@@ -203,9 +240,10 @@ Default profile settings sync to `users/{uid}` under `defaultProfile`.
 
 `lib/features/saves/guest_migration.dart`:
 
-- guest bucket key: `scoreSets:guest`
+- guest bucket key (legacy signed-out): `scoreSets:guest`
 - anonymous guest bucket: `scoreSets:guest:{anonUid}`
 - legacy local user bucket: `scoreSets:{uid}`
+- tracking keys: `scoreSets:lastAnonUid`, `scoreSets:guestOwnerUid`
 - user data path: `users/{uid}/scoreSets`
 - guest data is copied into Firestore when present
 - profile settings path: `users/{uid}` → `defaultProfile`
@@ -238,6 +276,7 @@ Location:
 - `lib/features/proctor/`
 
 This area includes the proctor screen and tools (timing, calculators, etc.).
+Includes plate math, height/weight, and body fat utilities.
 
 ---
 
@@ -255,6 +294,11 @@ Shared widgets:
 ---
 
 ## 11. Assets (SVG icons, ranks)
+
+Other assets:
+
+- `assets/forms/` (DA 705 template)
+- `assets/onboarding/` (login showcase images)
 
 ### Rank insignias
 
