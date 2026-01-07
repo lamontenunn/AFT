@@ -22,27 +22,38 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.109820847091-sv9fj678bvkgoscevikmtph45aa3n372</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>This app may discover devices on your local network for development/debug and companion features.</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_dartobservatory._tcp</string>
 		<string>_fluttervmservice._tcp</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app may discover devices on your local network for development/debug and companion features.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
-	<key>UIFileSharingEnabled</key>
-	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

@@ -76,7 +76,7 @@ class _ChartRowTileState extends State<_ChartRowTile> {
     final combos = widget.row.combos;
     final hasMultiple = combos.length > 1;
     final plates = combos.isEmpty ? const <int>[] : combos[_comboIndex];
-    final platesStr = plates.isEmpty ? 'None' : plates.join(' + ');
+    final platesStr = 'Per side: ${formatPlatesPerSide(plates)}';
 
     return ListTile(
       contentPadding: EdgeInsets.zero,

@@ -674,11 +674,6 @@ class _ProfileButton extends ConsumerWidget {
 
                         Navigator.of(context).pop();
                         await ref.read(authActionsProvider).signOut();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Signed out')),
-                          );
-                        }
                       },
                     ),
                   const SizedBox(height: 8),

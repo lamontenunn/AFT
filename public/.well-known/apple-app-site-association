@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "MTCG6EKUNY.com.lamontenunn.aftpro",
+        "paths": ["/reset*", "/__/auth/*"]
+      }
+    ]
+  }
+}

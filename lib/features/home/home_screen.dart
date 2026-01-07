@@ -13,6 +13,7 @@ import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
 import 'package:aft_firebase_app/features/aft/utils/formatters.dart';
+import 'package:aft_firebase_app/features/aft/utils/sdc_segment_info.dart';
 import 'package:aft_firebase_app/features/aft/logic/slider_config.dart'
     as slidercfg;
 import 'package:aft_firebase_app/widgets/aft_event_slider.dart';
@@ -680,6 +681,18 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
             // Sprint-Drag-Carry card
             AftEventCard(
               title: 'Sprint-Drag-Carry',
+              titleTrailing: IconButton(
+                tooltip: 'SDC segment targets',
+                onPressed: () => showSdcSegmentInfoSheet(context, profile),
+                iconSize: 16,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                icon: Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
               icon: Icons.timer_outlined,
               compact: true,
               leading: const AftSvgIcon(

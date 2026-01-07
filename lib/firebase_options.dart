@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyC0CzPojuDi5_5eEkzNHANg89S7oQgi3Ew',
-    appId: '1:109820847091:android:e992649ee0b026bc65a886',
+    appId: '1:109820847091:android:0853ad7c5a63fa4b65a886',
     messagingSenderId: '109820847091',
     projectId: 'aft-firebase-app-1760071390',
     storageBucket: 'aft-firebase-app-1760071390.firebasestorage.app',
@@ -59,11 +59,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyC7IYCyExhiNpMYReqU-qLwidj-90q5-Iw',
-    appId: '1:109820847091:ios:e3f686da70448e6765a886',
+    appId: '1:109820847091:ios:9579a66742a6a7a565a886',
     messagingSenderId: '109820847091',
     projectId: 'aft-firebase-app-1760071390',
     storageBucket: 'aft-firebase-app-1760071390.firebasestorage.app',
-    iosBundleId: 'com.lamontenunn.aftApp',
+    iosClientId: '109820847091-sv9fj678bvkgoscevikmtph45aa3n372.apps.googleusercontent.com',
+    iosBundleId: 'com.lamontenunn.aftpro',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -72,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '109820847091',
     projectId: 'aft-firebase-app-1760071390',
     storageBucket: 'aft-firebase-app-1760071390.firebasestorage.app',
-    iosBundleId: 'com.example.aftFirebaseApp',
+    iosBundleId: 'com.lamontenunn.aftpro',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

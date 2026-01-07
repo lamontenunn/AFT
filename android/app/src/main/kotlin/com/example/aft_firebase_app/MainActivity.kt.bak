@@ -1,0 +1,4 @@
+package com.lamontenunn.aftpro
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity: FlutterActivity()

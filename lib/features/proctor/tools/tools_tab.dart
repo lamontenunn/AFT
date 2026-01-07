@@ -454,7 +454,7 @@ class _PlateMathCardState extends State<_PlateMathCard> {
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             Text(
-              'Assumes a 60 lb bar and plates 45/35/25/15/10 (per side).',
+              'Assumes a 60 lb bar and equal loading on both sides with 45/35/25/15/10 lb plates.',
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -487,10 +487,8 @@ class _PlateMathCardState extends State<_PlateMathCard> {
             const SizedBox(height: 12),
             if (res != null && _error == null) ...[
               _ResultRow(
-                label: 'Plates per side',
-                value: (displayedPlates == null || displayedPlates.isEmpty)
-                    ? 'None'
-                    : displayedPlates.join(' + '),
+                label: 'Plates per side (each side of bar)',
+                value: formatPlatesPerSide(displayedPlates ?? const []),
               ),
               _ResultRow(label: 'Bar', value: '${res.barLbs} lb'),
               _ResultRow(

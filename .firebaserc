@@ -1,6 +1,7 @@
 {
   "projects": {
-    "aftapp": "aft-firebase-app-1760071390"
+    "aftapp": "aft-firebase-app-1760071390",
+    "default": "aft-firebase-app-1760071390"
   },
   "targets": {},
   "etags": {}

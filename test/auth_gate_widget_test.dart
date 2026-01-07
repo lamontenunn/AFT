@@ -5,15 +5,15 @@ import 'package:aft_firebase_app/features/auth/sign_in_page.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_auth.dart';
 
 void main() {
-  Widget _wrap(Widget child, List<Override> overrides) {
+  Widget _wrap(Widget child, List overrides) {
     return ProviderScope(
-      overrides: overrides,
+      overrides: overrides.cast(),
       child: MaterialApp(home: child),
     );
   }
