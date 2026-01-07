@@ -18,11 +18,12 @@ It is intended for internal developers and AI agents who need to understand the 
   - resets user-scoped providers on auth changes
   - tracks anonymous uid for migration
   - migrates guest data when a non-anonymous user signs in
-- Sign-in methods: email/password and anonymous (guest).
+- Sign-in methods: email/password, Google, Apple (iOS/macOS), and anonymous (guest).
 - Saved data routing:
-  - signed-out user -> local bucket scoreSets:signed-out
+  - signed-out user -> no saved sets (DisabledAftRepository)
   - anonymous user -> local bucket scoreSets:guest:{anonUid}
   - signed-in (non-anonymous) user -> Firestore users/{uid}/scoreSets
+  - legacy signed-out bucket scoreSets:guest is migration-only
 - Default profile settings are stored locally per user scope and sync to Firestore for signed-in users.
 - When a guest upgrades to an account, profile data is migrated from guest scope to uid scope.
 - Guest migration merges legacy local buckets and clears them only after a verified server write.
@@ -209,6 +210,7 @@ This provider is watched in App, and listens to firebaseUserProvider:
 - On auth uid change:
   - clears the current editing set
   - invalidates aftRepositoryProvider and settingsProvider
+  - invalidates proctor session, inputs, timing, profile, and UI providers
 - If the user is anonymous:
   - trackGuestUser(uid)
 - If the user becomes non-anonymous (or the uid changes):
@@ -232,6 +234,15 @@ Current sign-in methods:
 2. Continue as Guest
    - Calls FirebaseAuth.signInAnonymously().
    - Tracks anon uid with GuestMigration.trackGuestUser so migration can find the bucket later.
+
+3. Continue with Apple (iOS/macOS)
+   - Uses sign_in_with_apple to obtain an Apple ID credential.
+   - Generates a random nonce, hashes it with SHA-256, and passes it to Apple.
+   - Builds an OAuth credential using idToken, rawNonce, and authorizationCode as accessToken when present.
+
+4. Continue with Google
+   - Uses google_sign_in to obtain Google tokens.
+   - Builds a GoogleAuthProvider credential and signs in with FirebaseAuth.
 
 Navigation:
 
@@ -268,18 +279,20 @@ Required configuration:
 
 ## Persistence + guest buckets
 
-Local score sets are stored by LocalAftRepository under the key:
+Local score sets are stored by LocalAftRepository under the key (when local storage is used):
 
 - scoreSets:{userId}
 
-where userId is the value from effectiveUserIdProvider.
+where userId is the value from effectiveUserIdProvider. Signed-out users use DisabledAftRepository,
+so no local writes happen when signed out.
 
 Buckets in use:
 
-- signed-out -> scoreSets:signed-out (current)
+- signed-out -> no saved sets (DisabledAftRepository)
 - anonymous -> scoreSets:guest:{anonUid}
 - legacy signed-out -> scoreSets:guest (migration only)
 - legacy local signed-in -> scoreSets:{uid} (migration only)
+- tracking keys -> scoreSets:lastAnonUid, scoreSets:guestOwnerUid
 
 Firestore:
 
