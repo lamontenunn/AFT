@@ -139,6 +139,13 @@ class ArmyTheme {
           );
         }),
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: ArmyNeutrals.gray900,
+        contentTextStyle:
+            textTheme.bodyMedium?.copyWith(color: ArmyNeutrals.gray100),
+        actionTextColor: ArmyColors.gold,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -279,6 +286,13 @@ class ArmyTheme {
             color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
           );
         }),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: ArmyNeutrals.gray900,
+        contentTextStyle:
+            textTheme.bodyMedium?.copyWith(color: ArmyNeutrals.gray100),
+        actionTextColor: ArmyColors.gold,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

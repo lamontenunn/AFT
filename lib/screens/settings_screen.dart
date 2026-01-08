@@ -242,7 +242,7 @@ class SettingsScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Theme selection is coming soon. Dark mode is currently the default.',
+                      'Theme selection is coming soon.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),

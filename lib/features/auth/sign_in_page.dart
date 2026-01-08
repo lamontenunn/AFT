@@ -689,6 +689,10 @@ class _SignInPageState extends ConsumerState<SignInPage> {
 
   @override
   void dispose() {
+    final sheetContext = _emailSheetContext;
+    if (sheetContext != null && sheetContext.mounted) {
+      Navigator.of(sheetContext).pop();
+    }
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();

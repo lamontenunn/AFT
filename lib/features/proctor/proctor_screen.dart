@@ -15,6 +15,7 @@ import 'package:aft_firebase_app/features/proctor/state/proctor_ui_state.dart';
 import 'package:aft_firebase_app/features/proctor/state/providers.dart';
 import 'package:aft_firebase_app/features/proctor/timing/thresholds.dart';
 import 'package:aft_firebase_app/features/proctor/timing/timer_controller.dart';
+import 'package:aft_firebase_app/features/proctor/instructions_tab.dart';
 import 'package:aft_firebase_app/features/proctor/tools/tools_tab.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
 
@@ -239,10 +240,7 @@ class _ProctorScreenState extends ConsumerState<ProctorScreen> {
           }),
         );
       case ProctorTab.instructions:
-        return const _PlaceholderCard(
-          title: 'Instructions (MVP)',
-          body: 'Field-friendly event instructions will appear here.',
-        );
+        return const ProctorInstructionsTab();
       case ProctorTab.calculators:
         return const ProctorToolsTab();
     }
