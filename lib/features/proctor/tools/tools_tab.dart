@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart'
     show AftSex;
+import 'package:aft_firebase_app/features/planner/lane_planner_screen.dart';
 import 'package:aft_firebase_app/features/proctor/tools/body_fat.dart';
 import 'package:aft_firebase_app/features/proctor/tools/height_weight.dart';
 import 'package:aft_firebase_app/features/proctor/tools/plate_math.dart';
@@ -23,7 +24,7 @@ class ProctorToolsTab extends StatefulWidget {
 }
 
 class _ProctorToolsTabState extends State<ProctorToolsTab> {
-  int _toolIndex = 0; // 0 plate, 1 body fat, 2 height/weight
+  int _toolIndex = 0; // 0 plate, 1 body fat, 2 height/weight, 3 lane planner
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +39,10 @@ class _ProctorToolsTabState extends State<ProctorToolsTab> {
           const _PlateMathCard()
         else if (_toolIndex == 1)
           const _BodyFatCard()
+        else if (_toolIndex == 2)
+          const _HeightWeightCard()
         else
-          const _HeightWeightCard(),
+          const LanePlannerPanel(),
       ],
     );
   }
@@ -88,6 +91,9 @@ class _ToolsIconSelector extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium
                       ?.copyWith(fontWeight: FontWeight.w800, color: fg),
                 ),
@@ -134,6 +140,12 @@ class _ToolsIconSelector extends StatelessWidget {
               BlendMode.srcIn,
             ),
           ),
+        ),
+        const SizedBox(width: 10),
+        toolButton(
+          index: 3,
+          label: 'Lane Planner',
+          icon: const Icon(Icons.view_column_outlined),
         ),
       ],
     );
