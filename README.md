@@ -54,6 +54,7 @@ Additional docs:
 
 - Email/password, Google, and Apple sign-in (Apple available on iOS/macOS).
 - Anonymous sign-in supported.
+- OAuth sign-in attempts to link anonymous users to preserve uid when possible.
 - Guest data can be migrated into a real user bucket on first non-anonymous sign-in.
 - Signed-out users cannot access saved tests; guests stay local-only; signed-in users sync via Firestore.
 - Saved tests can be exported to DA Form 705 (page 1) using profile defaults when available.
@@ -226,6 +227,8 @@ Repository layer:
 Signed-in users sync saved sets across devices via Firestore.
 Guests store locally (SharedPreferences), and signed-out users do not store saved sets.
 Default profile settings sync to `users/{uid}` under `defaultProfile`.
+Firestore rules (see `firestore.rules`) enforce schema validation and prevent
+`createdAt` changes after creation.
 
 ### Saved model
 

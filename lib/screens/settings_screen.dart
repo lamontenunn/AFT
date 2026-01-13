@@ -6,10 +6,15 @@ import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/screens/edit_default_profile_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Body-only settings screen. Wrapped by AftScaffold(showHeader: false).
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  static const String _supportEmail = 'contact@nunntechnologies.com';
+  static const String _standardsSource = 'AFT scoring tables (embedded)';
+  static const String _standardsVersion = 'v1';
 
   static String _displayName(DefaultProfileSettings dp) {
     final first = dp.firstName?.trim();
@@ -36,6 +41,7 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final ctrl = ref.read(settingsProvider.notifier);
     final dp = settings.defaultProfile;
+    final packageInfoFuture = PackageInfo.fromPlatform();
 
     String ymd(DateTime d) =>
         '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -266,11 +272,11 @@ class SettingsScreen extends ConsumerWidget {
         ),
         const Divider(height: 1),
 
-        // About
+        // About & support
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            'About',
+            'About & support',
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
@@ -278,44 +284,107 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
         FutureBuilder<PackageInfo>(
-          future: PackageInfo.fromPlatform(),
+          future: packageInfoFuture,
           builder: (context, snap) {
             final info = snap.data;
             final version = info?.version ?? '—';
             final build = info?.buildNumber ?? '—';
-            return ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text('Version $version ($build)'),
-              subtitle: const Text('AFT Calculator'),
-              onTap: () {
-                showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('About'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Made by Nunn Technologies'),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Not affiliated with or endorsed by the U.S. Army or Department of Defense.',
-                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                                color:
-                                    Theme.of(ctx).colorScheme.onSurfaceVariant,
-                              ),
+            return Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text('Version $version ($build)'),
+                  subtitle: const Text('AFT Calculator'),
+                  onTap: () {
+                    showDialog<void>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('About'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Made by Nunn Technologies'),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Not affiliated with or endorsed by the U.S. Army or Department of Defense.',
+                              style: Theme.of(ctx)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(ctx)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Close'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('Close'),
+                          ),
+                        ],
                       ),
-                    ],
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.rule_outlined),
+                  title: const Text('Standards source'),
+                  subtitle: const Text(_standardsSource),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.verified_outlined),
+                  title: const Text('Standards version'),
+                  subtitle: const Text(_standardsVersion),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.mail_outline),
+                  title: const Text('Contact support'),
+                  subtitle: const Text('Opens your email app'),
+                  onTap: () => _sendSupportEmail(
+                    context,
+                    subject: 'AFT App Support',
+                    version: version,
+                    build: build,
                   ),
-                );
-              },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.lightbulb_outline),
+                  title: const Text('Request a feature'),
+                  subtitle: const Text('Share an idea or improvement'),
+                  onTap: () => _sendSupportEmail(
+                    context,
+                    subject: 'AFT App Feature Request',
+                    version: version,
+                    build: build,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.bug_report_outlined),
+                  title: const Text('Submit a bug'),
+                  subtitle: const Text('Report a problem or crash'),
+                  onTap: () => _sendSupportEmail(
+                    context,
+                    subject: 'AFT App Bug Report',
+                    version: version,
+                    build: build,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined),
+                  title: const Text('Privacy policy'),
+                  subtitle: const Text('View inside the app'),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const _PrivacyPolicyScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             );
           },
         ),
@@ -332,6 +401,43 @@ class SettingsScreen extends ConsumerWidget {
         (now.month == dob.month && now.day >= dob.day);
     if (!hasHadBirthdayThisYear) age--;
     return age.clamp(0, 150);
+  }
+}
+
+Future<void> _sendSupportEmail(
+  BuildContext context, {
+  required String subject,
+  required String version,
+  required String build,
+}) async {
+  final body = [
+    'Please describe your request below:',
+    '',
+    '---',
+    'App version: $version ($build)',
+  ].join('\n');
+  final uri = Uri(
+    scheme: 'mailto',
+    path: SettingsScreen._supportEmail,
+    queryParameters: {'subject': subject, 'body': body},
+  );
+  await _openExternalLink(context, uri);
+}
+
+Future<void> _openExternalLink(BuildContext context, Uri uri) async {
+  try {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open link.')),
+      );
+    }
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open link.')),
+      );
+    }
   }
 }
 
@@ -362,6 +468,196 @@ class _SummaryRow extends StatelessWidget {
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _PrivacyPolicyScreen extends StatelessWidget {
+  const _PrivacyPolicyScreen();
+
+  static const List<String> _headerLines = [
+    'Privacy Policy - AFT Pro',
+    'Last updated: January 8, 2026',
+  ];
+
+  static const List<_PolicySection> _sections = [
+    _PolicySection(
+      '1. Overview',
+      [
+        'This Privacy Policy explains how the AFT app (the "App") collects, uses, stores, and shares information when you use it.',
+        'This policy applies to the App and related services we provide. It does not cover third-party services or websites you may access from the App.',
+      ],
+    ),
+    _PolicySection(
+      '2. Information We Collect',
+      [
+        'A. Account and authentication information (only if you choose to sign in)',
+        '- A unique account identifier (cloud UID).',
+        '- Email address (if you use email/password sign-in).',
+        '- Basic sign-in metadata provided by Apple or Google (if you choose those methods).',
+        'B. Fitness test data you enter',
+        '- AFT event inputs (repetitions/times).',
+        '- Calculated scores and totals.',
+        '- Saved score sets and timestamps.',
+        '- Profile defaults you configure (such as sex, age band, test date, and standard selection).',
+        '- Guest mode: data may be stored locally on your device only.',
+        '- Signed-in use: data may be synced to the cloud so you can access it on another device.',
+        'C. Analytics data',
+        '- We use Google Analytics to understand how the App is used and to improve performance and features.',
+        '- Analytics may collect app interactions, device/app information (device model, OS version, app version), and approximate location derived from IP address.',
+        '- We do not use Google crash reporting.',
+      ],
+    ),
+    _PolicySection(
+      '3. How We Use Your Information',
+      [
+        '- Provide core functionality (scoring, saving, exporting, and syncing when you sign in).',
+        '- Maintain authentication and account access (if you sign in).',
+        '- Sync saved data across devices when you are signed in.',
+        '- Improve app quality and user experience (analytics).',
+      ],
+    ),
+    _PolicySection(
+      '4. Where Your Data Is Stored',
+      [
+        'A. On-device storage',
+        '- Some data may be stored locally on your device (for example, preferences and saved score sets in guest mode).',
+        'B. Cloud storage',
+        '- If you sign in, your saved AFT data and related settings may be stored in Google cloud services (such as a cloud database) associated with your account.',
+      ],
+    ),
+    _PolicySection(
+      '5. Sharing of Information',
+      [
+        'We do not sell your personal information.',
+        '- Service providers: We use third-party services to operate the App (for example, Google services for authentication, cloud storage, and analytics).',
+        '- User-initiated sharing: If you export and share a document (such as a PDF export), it will be shared with recipients you select using your device\'s sharing tools.',
+        '- Legal compliance: We may share information if required by law or to protect rights, safety, or security.',
+      ],
+    ),
+    _PolicySection(
+      '6. Data Retention',
+      [
+        'We retain account and saved data as long as needed to provide the App\'s functionality. You can request deletion as described below.',
+        'Some information may remain temporarily in backups for operational or legal reasons.',
+      ],
+    ),
+    _PolicySection(
+      '7. Your Choices and Controls',
+      [
+        'A. Guest mode',
+        '- You can use the App without fully signing in. In guest mode, your saved data may remain on your device and may be lost if you delete the App or clear device storage.',
+        'B. Account deletion / data deletion',
+        '- You can request deletion of your account and associated cloud-synced data via the in-app support options.',
+        '- We may need to verify your identity before processing deletion.',
+        'C. Analytics controls',
+        '- You may be able to limit or reset certain analytics collection through your device settings (where available). Disabling analytics may reduce our ability to improve the App.',
+      ],
+    ),
+    _PolicySection(
+      '8. Security',
+      [
+        'We use reasonable administrative, technical, and physical safeguards designed to protect your information.',
+        'Data transmitted between the App and backend services is generally protected using encryption in transit.',
+        'Access to cloud-stored user data is restricted to authenticated users.',
+      ],
+    ),
+    _PolicySection(
+      '9. International Users',
+      [
+        'If you use the App from outside the United States, your information may be processed and stored in the United States or other countries where our service providers operate.',
+      ],
+    ),
+    _PolicySection(
+      '10. Children\'s Privacy',
+      [
+        'The App is intended for a general audience and is not directed to children under 13.',
+        'We do not knowingly collect personal information from children in a targeted manner. If you believe a child has provided personal information, contact us and we will address it.',
+      ],
+    ),
+    _PolicySection(
+      '11. Changes to This Policy',
+      [
+        'We may update this Privacy Policy from time to time. We will revise the "Last updated" date at the top when changes are made.',
+      ],
+    ),
+    _PolicySection(
+      '12. Contact',
+      [
+        'If you have questions or requests related to privacy, use the in-app support options (Contact support, Request a feature, Submit a bug) to email us.',
+      ],
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Privacy policy'),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            Text(
+              _headerLines.first,
+              style:
+                  theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            for (final line in _headerLines.skip(1))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  line,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            const SizedBox(height: 16),
+            for (final section in _sections) ...[
+              _PolicySectionView(section: section),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PolicySection {
+  const _PolicySection(this.title, this.lines);
+
+  final String title;
+  final List<String> lines;
+}
+
+class _PolicySectionView extends StatelessWidget {
+  const _PolicySectionView({required this.section});
+
+  final _PolicySection section;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          section.title,
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        for (final line in section.lines)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              line,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
       ],
     );
   }

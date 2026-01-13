@@ -19,6 +19,7 @@ It is intended for internal developers and AI agents who need to understand the 
   - tracks anonymous uid for migration
   - migrates guest data when a non-anonymous user signs in
 - Sign-in methods: email/password, Google, Apple (iOS/macOS), and anonymous (guest).
+- OAuth sign-ins (Google/Apple) attempt to link anonymous users to preserve uid; if the credential is already in use, the app falls back to sign-in.
 - Saved data routing:
   - signed-out user -> no saved sets (DisabledAftRepository)
   - anonymous user -> local bucket scoreSets:guest:{anonUid}
@@ -239,10 +240,14 @@ Current sign-in methods:
    - Uses sign_in_with_apple to obtain an Apple ID credential.
    - Generates a random nonce, hashes it with SHA-256, and passes it to Apple.
    - Builds an OAuth credential using idToken, rawNonce, and authorizationCode as accessToken when present.
+   - If the current user is anonymous, linkWithCredential is attempted first to preserve the uid.
+     If the credential is already in use, the app falls back to signInWithCredential.
 
 4. Continue with Google
    - Uses google_sign_in to obtain Google tokens.
    - Builds a GoogleAuthProvider credential and signs in with FirebaseAuth.
+   - If the current user is anonymous, linkWithCredential is attempted first to preserve the uid.
+     If the credential is already in use, the app falls back to signInWithCredential.
 
 Navigation:
 
@@ -298,6 +303,7 @@ Firestore:
 
 - User data lives in users/{uid}/scoreSets (document id = ScoreSet.id).
 - Default profile settings live in users/{uid} under defaultProfile.
+- Firestore rules enforce schema validation and prevent changes to createdAt after creation.
 
 ---
 

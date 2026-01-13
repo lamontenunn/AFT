@@ -92,7 +92,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Continue as Guest'));
+    final guestButton = find.text('Continue as Guest');
+    await tester.ensureVisible(guestButton);
+    await tester.tap(guestButton);
     await tester.pump();
 
     expect(spy.trackedUids, ['anon42']);
