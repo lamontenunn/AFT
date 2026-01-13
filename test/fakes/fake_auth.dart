@@ -30,6 +30,7 @@ class FakeAuthController {
     _controller = StreamController<User?>.broadcast();
     auth = MockFirebaseAuth();
     when(() => auth.authStateChanges()).thenAnswer((_) => _controller.stream);
+    when(() => auth.userChanges()).thenAnswer((_) => _controller.stream);
     when(() => auth.currentUser).thenAnswer((_) => _currentUser);
     _currentUser = initialUser;
     if (initialUser != null) {

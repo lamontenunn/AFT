@@ -103,6 +103,20 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     return null;
   }
 
+  void _closeAuthOverlays() {
+    final sheetContext = _emailSheetContext;
+    if (sheetContext != null && sheetContext.mounted) {
+      Navigator.of(sheetContext).pop();
+    }
+    _emailSheetSetState = null;
+    _emailSheetContext = null;
+
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
   Future<void> _submit() async {
     final auth = ref.read(firebaseAuthProvider);
     if (auth == null) {
@@ -141,9 +155,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
           password: password,
         );
       }
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      _closeAuthOverlays();
     } on FirebaseAuthException catch (e) {
       _setStateIfMounted(
           () => _error = _friendlyAuthError(e, includeCode: true));
@@ -208,9 +220,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       if (user != null) {
         await ref.read(guestMigrationProvider).trackGuestUser(user.uid);
       }
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      _closeAuthOverlays();
     } on FirebaseAuthException catch (e) {
       _setStateIfMounted(() => _error = _friendlyAuthError(e));
     } catch (e) {
@@ -340,11 +350,23 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                 : null,
       );
 
-      await auth.signInWithCredential(oauthCredential);
-
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+      final currentUser = auth.currentUser;
+      if (currentUser != null && currentUser.isAnonymous) {
+        try {
+          await currentUser.linkWithCredential(oauthCredential);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'credential-already-in-use' ||
+              e.code == 'email-already-in-use') {
+            await auth.signInWithCredential(oauthCredential);
+          } else {
+            rethrow;
+          }
+        }
+      } else {
+        await auth.signInWithCredential(oauthCredential);
       }
+
+      _closeAuthOverlays();
     } on SignInWithAppleAuthorizationException catch (e) {
       assert(() {
         debugPrint('Apple sign-in authorization error: ${e.code} ${e.message}');
@@ -404,11 +426,23 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         idToken: googleAuth.idToken,
       );
 
-      await auth.signInWithCredential(credential);
-
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+      final currentUser = auth.currentUser;
+      if (currentUser != null && currentUser.isAnonymous) {
+        try {
+          await currentUser.linkWithCredential(credential);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'credential-already-in-use' ||
+              e.code == 'email-already-in-use') {
+            await auth.signInWithCredential(credential);
+          } else {
+            rethrow;
+          }
+        }
+      } else {
+        await auth.signInWithCredential(credential);
       }
+
+      _closeAuthOverlays();
     } on FirebaseAuthException catch (e) {
       _setStateIfMounted(() => _error = _friendlyAuthError(e));
     } catch (e) {

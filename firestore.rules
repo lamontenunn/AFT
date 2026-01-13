@@ -1,11 +1,178 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isStringOrNull(value) {
+      return value == null || value is string;
+    }
+
+    function isBoolOrNull(value) {
+      return value == null || value is bool;
+    }
+
+    function isTimestampOrNull(value) {
+      return value == null || value is timestamp;
+    }
+
+    function isNullableInt(value) {
+      return value == null || value is int;
+    }
+
+    function isNullableNonNegativeInt(value) {
+      return value == null || (value is int && value >= 0);
+    }
+
+    function isNullableNonNegativeNumber(value) {
+      return value == null || (value is number && value >= 0);
+    }
+
+    function isMeasurement(value) {
+      return value == null || value in ['imperial', 'metric'];
+    }
+
+    function isSex(value) {
+      return value == null || value in ['male', 'female'];
+    }
+
+    function isStandard(value) {
+      return value == null || value in ['general', 'combat'];
+    }
+
+    function isDefaultProfile(profile) {
+      return profile is map
+        && profile.keys().hasOnly([
+          'firstName',
+          'lastName',
+          'middleInitial',
+          'rankAbbrev',
+          'unit',
+          'mos',
+          'payGrade',
+          'onProfile',
+          'sex',
+          'birthdate',
+          'measurementSystem',
+          'height',
+          'weight',
+          'bodyFatPercent'
+        ])
+        && isStringOrNull(profile.firstName)
+        && isStringOrNull(profile.lastName)
+        && isStringOrNull(profile.middleInitial)
+        && isStringOrNull(profile.rankAbbrev)
+        && isStringOrNull(profile.unit)
+        && isStringOrNull(profile.mos)
+        && isStringOrNull(profile.payGrade)
+        && isBoolOrNull(profile.onProfile)
+        && isSex(profile.sex)
+        && isTimestampOrNull(profile.birthdate)
+        && isMeasurement(profile.measurementSystem)
+        && isNullableNonNegativeNumber(profile.height)
+        && isNullableNonNegativeNumber(profile.weight)
+        && isNullableNonNegativeNumber(profile.bodyFatPercent);
+    }
+
+    function isMigration(migration) {
+      return migration is map
+        && migration.keys().hasOnly(['markerId', 'expectedCount', 'updatedAt'])
+        && migration.markerId is string
+        && migration.expectedCount is int
+        && migration.expectedCount >= 0
+        && migration.updatedAt is timestamp;
+    }
+
+    function isUserDocFields(data) {
+      return (data.defaultProfile == null || isDefaultProfile(data.defaultProfile))
+        && isTimestampOrNull(data.updatedAt)
+        && (data.migration == null || isMigration(data.migration));
+    }
+
+    function isUserDocCreate(data) {
+      return data.keys().hasOnly(['defaultProfile', 'updatedAt', 'migration'])
+        && isUserDocFields(data);
+    }
+
+    function isUserDocUpdate(data) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['defaultProfile', 'updatedAt', 'migration'])
+        && isUserDocFields(data);
+    }
+
+    function isScoreProfile(profile) {
+      return profile is map
+        && profile.keys().hasOnly(['age', 'sex', 'standard', 'testDate'])
+        && profile.keys().hasAll(['age', 'sex', 'standard'])
+        && profile.age is int
+        && profile.age >= 0
+        && profile.age <= 100
+        && profile.sex in ['male', 'female']
+        && profile.standard in ['general', 'combat']
+        && isTimestampOrNull(profile.testDate);
+    }
+
+    function isScoreInputs(inputs) {
+      return inputs is map
+        && inputs.keys().hasOnly(['mdlLbs', 'pushUps', 'sdc', 'plank', 'run2mi'])
+        && isNullableNonNegativeInt(inputs.mdlLbs)
+        && isNullableNonNegativeInt(inputs.pushUps)
+        && isNullableNonNegativeInt(inputs.sdc)
+        && isNullableNonNegativeInt(inputs.plank)
+        && isNullableNonNegativeInt(inputs.run2mi);
+    }
+
+    function isScoreComputed(computed) {
+      return computed is map
+        && computed.keys().hasOnly([
+          'mdlScore',
+          'pushUpsScore',
+          'sdcScore',
+          'plankScore',
+          'run2miScore',
+          'total'
+        ])
+        && isNullableNonNegativeInt(computed.mdlScore)
+        && isNullableNonNegativeInt(computed.pushUpsScore)
+        && isNullableNonNegativeInt(computed.sdcScore)
+        && isNullableNonNegativeInt(computed.plankScore)
+        && isNullableNonNegativeInt(computed.run2miScore)
+        && isNullableNonNegativeInt(computed.total);
+    }
+
+    function isScoreSet(data, setId) {
+      return data.keys().hasOnly(['id', 'profile', 'inputs', 'computed', 'createdAt'])
+        && data.keys().hasAll(['profile', 'inputs', 'createdAt'])
+        && (!data.keys().hasAny(['id']) || data.id == setId)
+        && data.createdAt is timestamp
+        && isScoreProfile(data.profile)
+        && isScoreInputs(data.inputs)
+        && (data.computed == null || isScoreComputed(data.computed));
+    }
+
+    function isCreatedAtUnchanged() {
+      return !resource.data.keys().hasAny(['createdAt'])
+        || request.resource.data.createdAt == resource.data.createdAt;
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isUserDocCreate(request.resource.data);
+      allow update: if isOwner(userId) && isUserDocUpdate(request.resource.data);
+      allow delete: if isOwner(userId);
 
       match /scoreSets/{setId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isScoreSet(request.resource.data, setId);
+        allow update: if isOwner(userId)
+          && isScoreSet(request.resource.data, setId)
+          && isCreatedAtUnchanged();
+        allow delete: if isOwner(userId);
       }
     }
   }

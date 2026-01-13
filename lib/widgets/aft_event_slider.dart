@@ -265,7 +265,9 @@ class _AftTimeSliderState extends State<AftTimeSlider> {
     final theme = Theme.of(context);
     final min = widget.config.min;
     final max = widget.config.max;
-    final int divisions = (max - min).toInt();
+    final divisions = widget.config.divisions;
+    final int? safeDivisions =
+        (divisions != null && divisions > 0) ? divisions : null;
 
     final clamped = widget.seconds.clamp(min.toInt(), max.toInt());
     final double uiValue =
@@ -302,7 +304,7 @@ class _AftTimeSliderState extends State<AftTimeSlider> {
             value: uiValue,
             min: min,
             max: max,
-            divisions: divisions,
+            divisions: safeDivisions,
             label: format(clamped),
             onChanged: (v) {
               final secondsRaw = widget.reversed ? (min + max - v) : v;
