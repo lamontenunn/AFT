@@ -13,12 +13,24 @@ service cloud.firestore {
       return value == null || value is string;
     }
 
+    function isLimitedStringOrNull(value, max) {
+      return value == null || (value is string && value.size() <= max);
+    }
+
     function isBoolOrNull(value) {
       return value == null || value is bool;
     }
 
+    function isServerTimestamp(value) {
+      return value == request.time;
+    }
+
     function isTimestampOrNull(value) {
-      return value == null || value is timestamp;
+      return value == null || value is timestamp || isServerTimestamp(value);
+    }
+
+    function isTimestamp(value) {
+      return value is timestamp || isServerTimestamp(value);
     }
 
     function isNullableInt(value) {
@@ -43,6 +55,14 @@ service cloud.firestore {
 
     function isStandard(value) {
       return value == null || value in ['general', 'combat'];
+    }
+
+    function isFeedbackType(value) {
+      return value in ['support', 'feature', 'bug'];
+    }
+
+    function isClientEventType(value) {
+      return value in ['profile_sync_error'];
     }
 
     function isDefaultProfile(profile) {
@@ -85,24 +105,32 @@ service cloud.firestore {
         && migration.markerId is string
         && migration.expectedCount is int
         && migration.expectedCount >= 0
-        && migration.updatedAt is timestamp;
+        && isTimestamp(migration.updatedAt);
     }
 
     function isUserDocFields(data) {
       return (data.defaultProfile == null || isDefaultProfile(data.defaultProfile))
-        && isTimestampOrNull(data.updatedAt)
-        && (data.migration == null || isMigration(data.migration));
+        && isTimestampOrNull(data.updatedAt);
     }
 
     function isUserDocCreate(data) {
       return data.keys().hasOnly(['defaultProfile', 'updatedAt', 'migration'])
-        && isUserDocFields(data);
+        && isUserDocFields(data)
+        && (data.migration == null || isMigration(data.migration));
     }
 
     function isUserDocUpdate(data) {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['defaultProfile', 'updatedAt', 'migration'])
-        && isUserDocFields(data);
+      return ((resource == null || resource.data == null)
+          ? data.keys().hasOnly(['defaultProfile', 'updatedAt', 'migration'])
+          : request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['defaultProfile', 'updatedAt', 'migration']))
+        && isUserDocFields(data)
+        && ((resource == null || resource.data == null)
+            ? (data.migration == null || isMigration(data.migration))
+            : (!request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['migration'])
+              || data.migration == null
+              || isMigration(data.migration)));
     }
 
     function isScoreProfile(profile) {
@@ -149,15 +177,69 @@ service cloud.firestore {
       return data.keys().hasOnly(['id', 'profile', 'inputs', 'computed', 'createdAt'])
         && data.keys().hasAll(['profile', 'inputs', 'createdAt'])
         && (!data.keys().hasAny(['id']) || data.id == setId)
-        && data.createdAt is timestamp
+        && isTimestamp(data.createdAt)
         && isScoreProfile(data.profile)
         && isScoreInputs(data.inputs)
         && (data.computed == null || isScoreComputed(data.computed));
     }
 
+    function isFeedback(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'type',
+          'message',
+          'userId',
+          'createdAt',
+          'appVersion',
+          'buildNumber',
+          'platform',
+          'isAnonymous'
+        ])
+        && data.keys().hasAll(['type', 'message', 'userId', 'createdAt'])
+        && isFeedbackType(data.type)
+        && data.message is string
+        && data.message.size() > 0
+        && data.message.size() <= 2000
+        && data.userId == request.auth.uid
+        && isTimestamp(data.createdAt)
+        && isStringOrNull(data.appVersion)
+        && isStringOrNull(data.buildNumber)
+        && isStringOrNull(data.platform)
+        && isBoolOrNull(data.isAnonymous);
+    }
+
+    function isClientEvent(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'type',
+          'userId',
+          'createdAt',
+          'code',
+          'message',
+          'operation',
+          'platform',
+          'appVersion',
+          'buildNumber',
+          'isAnonymous'
+        ])
+        && data.keys().hasAll(['type', 'userId', 'createdAt'])
+        && isClientEventType(data.type)
+        && data.userId == request.auth.uid
+        && isTimestamp(data.createdAt)
+        && isLimitedStringOrNull(data.code, 64)
+        && isLimitedStringOrNull(data.message, 500)
+        && (data.operation == null || data.operation in ['update', 'set'])
+        && isLimitedStringOrNull(data.platform, 32)
+        && isLimitedStringOrNull(data.appVersion, 32)
+        && isLimitedStringOrNull(data.buildNumber, 32)
+        && isBoolOrNull(data.isAnonymous);
+    }
+
     function isCreatedAtUnchanged() {
-      return !resource.data.keys().hasAny(['createdAt'])
-        || request.resource.data.createdAt == resource.data.createdAt;
+      return resource != null
+        && resource.data != null
+        && (!resource.data.keys().hasAny(['createdAt'])
+          || request.resource.data.createdAt == resource.data.createdAt);
     }
 
     match /users/{userId} {
@@ -174,6 +256,16 @@ service cloud.firestore {
           && isCreatedAtUnchanged();
         allow delete: if isOwner(userId);
       }
+    }
+
+    match /feedback/{feedbackId} {
+      allow create: if isSignedIn() && isFeedback(request.resource.data);
+      allow read, update, delete: if false;
+    }
+
+    match /clientEvents/{eventId} {
+      allow create: if isSignedIn() && isClientEvent(request.resource.data);
+      allow read, update, delete: if false;
     }
   }
 }

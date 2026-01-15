@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
+import 'package:aft_firebase_app/features/aft/state/aft_inputs.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/auth_state.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
@@ -13,6 +15,40 @@ import 'package:aft_firebase_app/features/saves/saved_test_dialog.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
 import 'package:aft_firebase_app/router/app_router.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class _LastSavedSnapshot {
+  final String userId;
+  final String signature;
+
+  const _LastSavedSnapshot({
+    required this.userId,
+    required this.signature,
+  });
+}
+
+class _LastSavedSnapshotNotifier extends Notifier<_LastSavedSnapshot?> {
+  @override
+  _LastSavedSnapshot? build() => null;
+}
+
+final _lastSavedSnapshotProvider =
+    NotifierProvider<_LastSavedSnapshotNotifier, _LastSavedSnapshot?>(
+        _LastSavedSnapshotNotifier.new);
+
+String _saveSignature(AftProfile profile, AftInputs inputs) {
+  return [
+    'age:${profile.age}',
+    'sex:${profile.sex.name}',
+    'standard:${profile.standard.name}',
+    'testDate:${profile.testDate?.toIso8601String() ?? ''}',
+    'mdl:${inputs.mdlLbs ?? ''}',
+    'pu:${inputs.pushUps ?? ''}',
+    'sdc:${inputs.sdc?.inSeconds ?? ''}',
+    'plank:${inputs.plank?.inSeconds ?? ''}',
+    'run2mi:${inputs.run2mi?.inSeconds ?? ''}',
+  ].join('|');
+}
 
 /// App shell with a collapsing AppBar, segmented control, and overflow sheet.
 /// - Title: "AFT Calculator"
@@ -47,10 +83,10 @@ class AftScaffold extends ConsumerWidget {
         data: NavigationBarThemeData(
           backgroundColor: ArmyColors.gold,
           indicatorColor: Colors.black12,
-          height: 30,
+          height: 44,
           iconTheme: MaterialStateProperty.resolveWith((states) {
             return IconThemeData(
-              size: 16,
+              size: 20,
               color: states.contains(MaterialState.selected)
                   ? Colors.black
                   : Colors.black87,
@@ -299,15 +335,26 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
 
     final auth = ref.watch(authStateProvider);
     final computed = ref.watch(aftComputedProvider);
+    final profile = ref.watch(aftProfileProvider);
     final inputs = ref.watch(aftInputsProvider);
     final editing = ref.watch(editingSetProvider);
+    final effectiveUserId = ref.watch(effectiveUserIdProvider);
+    final lastSnapshot = ref.watch(_lastSavedSnapshotProvider);
 
-    final bool canSave = auth.isSignedIn && computed.total != null;
-    final bool hasInputs = inputs.mdlLbs != null ||
-        inputs.pushUps != null ||
-        inputs.sdc != null ||
-        inputs.plank != null ||
-        inputs.run2mi != null;
+    bool hasAnyInputs(AftInputs data) =>
+        data.mdlLbs != null ||
+        data.pushUps != null ||
+        data.sdc != null ||
+        data.plank != null ||
+        data.run2mi != null;
+
+    final bool hasInputs = hasAnyInputs(inputs);
+    final currentSignature = _saveSignature(profile, inputs);
+    final bool isSameAsLast = lastSnapshot != null &&
+        lastSnapshot.userId == effectiveUserId &&
+        lastSnapshot.signature == currentSignature;
+    final bool canSave =
+        auth.isSignedIn && computed.total != null && hasInputs && !isSameAsLast;
 
     Future<void> doCancel() async {
       final ok = await showDialog<bool>(
@@ -369,6 +416,28 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
       final computedNow = ref.read(aftComputedProvider);
       final repo = ref.read(aftRepositoryProvider);
       final userId = ref.read(effectiveUserIdProvider);
+      final lastSnapshot = ref.read(_lastSavedSnapshotProvider);
+      if (!hasAnyInputs(inputsNow)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Enter at least one event result before saving.'),
+            ),
+          );
+        }
+        return;
+      }
+      final nowSignature = _saveSignature(profileNow, inputsNow);
+      if (lastSnapshot != null &&
+          lastSnapshot.userId == userId &&
+          lastSnapshot.signature == nowSignature) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No changes since last save.')),
+          );
+        }
+        return;
+      }
       final createdAt = editing?.createdAt ?? DateTime.now();
       final set = ScoreSet(
         id: editing?.id,
@@ -380,6 +449,8 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
 
       if (editing != null) {
         await repo.updateScoreSet(userId: userId, set: set);
+        ref.read(_lastSavedSnapshotProvider.notifier).state =
+            _LastSavedSnapshot(userId: userId, signature: nowSignature);
         // Clear editing state after successful update
         ref.read(editingSetProvider.notifier).state = null;
         if (context.mounted) {
@@ -427,6 +498,8 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
         }
       } else {
         await repo.saveScoreSet(userId: userId, set: set);
+        ref.read(_lastSavedSnapshotProvider.notifier).state =
+            _LastSavedSnapshot(userId: userId, signature: nowSignature);
         if (context.mounted) {
           await showSavedTestDialog(
             context,
@@ -548,6 +621,46 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
 class _ProfileButton extends ConsumerWidget {
   const _ProfileButton();
 
+  String _accountStatusLabel(User? user) {
+    if (user == null) return 'Signed out';
+    if (user.isAnonymous) return 'Guest session';
+    return 'Signed in';
+  }
+
+  String _accountMethodLabel(User? user) {
+    if (user == null) return 'Not signed in';
+    if (user.isAnonymous) return 'Guest (anonymous)';
+    final providerId = _primaryProviderId(user);
+    if (providerId == null) return 'Unknown';
+    return switch (providerId) {
+      'google.com' => 'Google',
+      'apple.com' => 'Apple',
+      'password' => 'Email/Password',
+      'phone' => 'Phone',
+      'facebook.com' => 'Facebook',
+      'github.com' => 'GitHub',
+      'twitter.com' => 'X',
+      'microsoft.com' => 'Microsoft',
+      _ => 'Other',
+    };
+  }
+
+  String? _accountEmail(User? user) {
+    if (user == null || user.isAnonymous) return null;
+    final email = user.email?.trim();
+    if (email == null || email.isEmpty) return null;
+    return email;
+  }
+
+  String? _primaryProviderId(User user) {
+    for (final info in user.providerData) {
+      if (info.providerId != 'firebase') return info.providerId;
+    }
+    return user.providerData.isNotEmpty
+        ? user.providerData.first.providerId
+        : null;
+  }
+
   String _initialsFor(AuthState state) {
     final name = state.displayName?.trim();
     if (name != null && name.isNotEmpty) {
@@ -621,18 +734,23 @@ class _ProfileButton extends ConsumerWidget {
               );
             }
             final isGuest = ref.watch(isGuestUserProvider);
+            final user = ref.watch(authUserProvider);
+            final details = [
+              _accountMethodLabel(user),
+              if (_accountEmail(user) != null) _accountEmail(user)!,
+            ].join(' • ');
             return SafeArea(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  ListTile(
+                    leading: Icon(isGuest
+                        ? Icons.person_outline
+                        : Icons.verified_user_outlined),
+                    title: Text(_accountStatusLabel(user)),
+                    subtitle: Text(details),
+                  ),
                   if (isGuest) ...[
-                    const ListTile(
-                      leading: Icon(Icons.person_outline),
-                      title: Text('Guest account'),
-                      subtitle: Text(
-                        'Create an account to keep data across devices.',
-                      ),
-                    ),
                     ListTile(
                       leading: const Icon(Icons.person_add),
                       title: const Text('Create account'),

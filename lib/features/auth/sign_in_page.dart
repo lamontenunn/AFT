@@ -14,44 +14,10 @@ import 'package:crypto/crypto.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-class SignInPage extends ConsumerStatefulWidget {
-  const SignInPage({super.key});
-
-  @override
-  ConsumerState<SignInPage> createState() => _SignInPageState();
-}
-
-class _SignInPageState extends ConsumerState<SignInPage> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  bool _isRegistering = false;
-  bool _showPassword = false;
-  bool _showConfirm = false;
-  bool _submitting = false;
-  bool _resetting = false;
-  String? _error;
-  String? _info;
-  StateSetter? _emailSheetSetState;
-  BuildContext? _emailSheetContext;
-
-  void _setStateIfMounted(VoidCallback fn) {
-    if (!mounted) return;
-    setState(fn);
-    final sheetContext = _emailSheetContext;
-    if (sheetContext != null && sheetContext.mounted) {
-      _emailSheetSetState?.call(() {});
-    } else {
-      _emailSheetSetState = null;
-      _emailSheetContext = null;
-    }
-  }
-
-  String _friendlyAuthError(FirebaseAuthException e,
-      {bool includeCode = false}) {
-    final message = () {
-      switch (e.code) {
+String _friendlyAuthError(FirebaseAuthException e,
+    {bool includeCode = false}) {
+  final message = () {
+    switch (e.code) {
       case 'invalid-email':
         return 'Enter a valid email address.';
       case 'user-disabled':
@@ -74,157 +40,60 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         return 'Network error. Check your connection and try again.';
       default:
         return e.message ?? 'Authentication failed.';
-      }
-    }();
-    if (!includeCode) return message;
-    return '$message (code: ${e.code})';
-  }
-
-  String? _validateEmail(String? value) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) return 'Enter your email';
-    if (!text.contains('@') || !text.contains('.')) {
-      return 'Enter a valid email address';
     }
-    return null;
+  }();
+  if (!includeCode) return message;
+  return '$message (code: ${e.code})';
+}
+
+class SignInPage extends ConsumerStatefulWidget {
+  const SignInPage({super.key});
+
+  @override
+  ConsumerState<SignInPage> createState() => _SignInPageState();
+}
+
+class _SignInPageState extends ConsumerState<SignInPage> {
+  bool _submitting = false;
+  String? _error;
+  String? _info;
+
+  void _setStateIfMounted(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
   }
 
-  String? _validatePassword(String? value) {
-    final text = value ?? '';
-    if (text.isEmpty) return 'Enter your password';
-    if (text.length < 6) return 'Password must be at least 6 characters';
-    return null;
-  }
-
-  String? _validateConfirm(String? value) {
-    if (!_isRegistering) return null;
-    if (value == null || value.isEmpty) return 'Confirm your password';
-    if (value != _passwordController.text) return 'Passwords do not match';
-    return null;
-  }
-
-  void _closeAuthOverlays() {
-    final sheetContext = _emailSheetContext;
-    if (sheetContext != null && sheetContext.mounted) {
-      Navigator.of(sheetContext).pop();
-    }
-    _emailSheetSetState = null;
-    _emailSheetContext = null;
-
+  Future<void> _closeSignInRouteIfNeeded() async {
     if (!mounted) return;
     if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+      await Navigator.of(context).maybePop();
     }
   }
 
-  Future<void> _submit() async {
-    final auth = ref.read(firebaseAuthProvider);
-    if (auth == null) {
-      _setStateIfMounted(() => _error = 'Auth not initialized');
-      return;
-    }
-    final valid = _formKey.currentState?.validate() ?? false;
-    if (!valid) return;
-
+  Future<void> _signInAnonymously() async {
+    if (_submitting) return;
     _setStateIfMounted(() {
       _submitting = true;
       _error = null;
       _info = null;
     });
-    FocusScope.of(context).unfocus();
-    try {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
-      final currentUser = auth.currentUser;
-      if (_isRegistering) {
-        if (currentUser != null && currentUser.isAnonymous) {
-          final credential = EmailAuthProvider.credential(
-            email: email,
-            password: password,
-          );
-          await currentUser.linkWithCredential(credential);
-        } else {
-          await auth.createUserWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
-        }
-      } else {
-        await auth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-      }
-      _closeAuthOverlays();
-    } on FirebaseAuthException catch (e) {
-      _setStateIfMounted(
-          () => _error = _friendlyAuthError(e, includeCode: true));
-    } catch (e) {
-      _setStateIfMounted(() => _error = 'Authentication failed: $e');
-    } finally {
-      _setStateIfMounted(() => _submitting = false);
-    }
-  }
-
-  Future<void> _sendPasswordReset() async {
-    final auth = ref.read(firebaseAuthProvider);
-    if (auth == null) {
-      _setStateIfMounted(() => _error = 'Auth not initialized');
-      return;
-    }
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      _setStateIfMounted(() => _error = 'Enter your email to reset password');
-      return;
-    }
-
-    _setStateIfMounted(() {
-      _resetting = true;
-      _error = null;
-      _info = null;
-    });
-    FocusScope.of(context).unfocus();
-    try {
-      final settings = PasswordResetLinks.buildActionCodeSettings();
-      if (settings == null) {
-        await auth.sendPasswordResetEmail(email: email);
-      } else {
-        await auth.sendPasswordResetEmail(
-          email: email,
-          actionCodeSettings: settings,
-        );
-      }
-      _setStateIfMounted(
-        () => _info =
-            'Password reset request sent to $email. If you do not receive it, '
-            'check spam/junk or try a different email provider.',
-      );
-    } on FirebaseAuthException catch (e) {
-      _setStateIfMounted(
-          () => _error = _friendlyAuthError(e, includeCode: true));
-    } catch (e) {
-      _setStateIfMounted(() => _error = 'Failed to send reset email: $e');
-    } finally {
-      _setStateIfMounted(() => _resetting = false);
-    }
-  }
-
-  Future<void> _signInAnonymously() async {
-    _setStateIfMounted(() {
-      _error = null;
-      _info = null;
-    });
+    var completed = false;
     try {
       final cred = await ref.read(authActionsProvider).signInAnonymously();
       final user = cred.user;
       if (user != null) {
         await ref.read(guestMigrationProvider).trackGuestUser(user.uid);
       }
-      _closeAuthOverlays();
+      completed = true;
+      await _closeSignInRouteIfNeeded();
     } on FirebaseAuthException catch (e) {
       _setStateIfMounted(() => _error = _friendlyAuthError(e));
     } catch (e) {
       _setStateIfMounted(() => _error = 'Anonymous sign-in failed: $e');
+    } finally {
+      if (!completed) {
+        _setStateIfMounted(() => _submitting = false);
+      }
     }
   }
 
@@ -287,7 +156,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
   }
 
   Future<void> _signInWithApple() async {
-    if (_submitting || _resetting) return;
+    if (_submitting) return;
     if (!_isAppleSupported) {
       _showSocialUnavailable('Apple');
       return;
@@ -313,6 +182,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       _info = null;
     });
 
+    var completed = false;
     try {
       final available = await SignInWithApple.isAvailable();
       if (!available) {
@@ -366,7 +236,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         await auth.signInWithCredential(oauthCredential);
       }
 
-      _closeAuthOverlays();
+      completed = true;
+      await _closeSignInRouteIfNeeded();
     } on SignInWithAppleAuthorizationException catch (e) {
       assert(() {
         debugPrint('Apple sign-in authorization error: ${e.code} ${e.message}');
@@ -394,12 +265,14 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     } catch (e) {
       _setStateIfMounted(() => _error = 'Apple sign-in failed: $e');
     } finally {
-      _setStateIfMounted(() => _submitting = false);
+      if (!completed) {
+        _setStateIfMounted(() => _submitting = false);
+      }
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    if (_submitting || _resetting) return;
+    if (_submitting) return;
 
     final auth = ref.read(firebaseAuthProvider);
     if (auth == null) {
@@ -413,6 +286,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       _info = null;
     });
 
+    var completed = false;
     try {
       final googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
@@ -442,24 +316,17 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         await auth.signInWithCredential(credential);
       }
 
-      _closeAuthOverlays();
+      completed = true;
+      await _closeSignInRouteIfNeeded();
     } on FirebaseAuthException catch (e) {
       _setStateIfMounted(() => _error = _friendlyAuthError(e));
     } catch (e) {
       _setStateIfMounted(() => _error = 'Google sign-in failed: $e');
     } finally {
-      _setStateIfMounted(() => _submitting = false);
+      if (!completed) {
+        _setStateIfMounted(() => _submitting = false);
+      }
     }
-  }
-
-  void _toggleRegistering() {
-    _setStateIfMounted(() {
-      _isRegistering = !_isRegistering;
-      _showConfirm = false;
-      _confirmController.clear();
-      _error = null;
-      _info = null;
-    });
   }
 
   Future<void> _showEmailAuthSheet() async {
@@ -478,261 +345,11 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, sheetSetState) {
-            _emailSheetSetState = sheetSetState;
-            _emailSheetContext = context;
-            final media = MediaQuery.of(context);
-            final isCompact = media.size.height < 700;
-            final textTheme = Theme.of(context).textTheme;
-            final fieldPadding = EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: isCompact ? 10 : 12,
-            );
-            final buttonPadding = EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: isCompact ? 10 : 12,
-            );
-            final textButtonPadding = EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: isCompact ? 0 : 4,
-            );
-            final canSubmit = !_submitting && !_resetting;
-            final titleStyle =
-                isCompact ? textTheme.titleMedium : textTheme.titleLarge;
-            final description = _isRegistering
-                ? 'Create an account to sync scores and save sessions.'
-                : 'Use your email and password to continue.';
-
-            return GestureDetector(
-              onTap: () => FocusScope.of(context).unfocus(),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  12,
-                  16,
-                  12 + media.viewInsets.bottom,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const _SheetHandle(),
-                      const SizedBox(height: 12),
-                      Text(
-                        _isRegistering
-                            ? 'Create account'
-                            : 'Sign in with email',
-                        style: titleStyle,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 12),
-                      Form(
-                        key: _formKey,
-                        child: AutofillGroup(
-                          child: Column(
-                            children: [
-                              TextFormField(
-                                controller: _emailController,
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                textCapitalization: TextCapitalization.none,
-                                autofillHints: const [AutofillHints.email],
-                                decoration: InputDecoration(
-                                  labelText: 'Email',
-                                  hintText: 'name@example.com',
-                                  isDense: true,
-                                  contentPadding: fieldPadding,
-                                ),
-                                validator: _validateEmail,
-                                enabled: canSubmit,
-                              ),
-                              const SizedBox(height: 6),
-                              TextFormField(
-                                controller: _passwordController,
-                                textInputAction: _isRegistering
-                                    ? TextInputAction.next
-                                    : TextInputAction.done,
-                                obscureText: !_showPassword,
-                                autocorrect: false,
-                                enableSuggestions: false,
-                                autofillHints: const [AutofillHints.password],
-                                decoration: InputDecoration(
-                                  labelText: 'Password',
-                                  isDense: true,
-                                  contentPadding: fieldPadding,
-                                  suffixIcon: IconButton(
-                                    tooltip: _showPassword
-                                        ? 'Hide password'
-                                        : 'Show password',
-                                    icon: Icon(
-                                      _showPassword
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                    ),
-                                    onPressed: () {
-                                      _setStateIfMounted(
-                                          () => _showPassword = !_showPassword);
-                                    },
-                                  ),
-                                ),
-                                validator: _validatePassword,
-                                enabled: canSubmit,
-                                onFieldSubmitted: (_) {
-                                  if (!_isRegistering) _submit();
-                                },
-                              ),
-                              if (_isRegistering) ...[
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _confirmController,
-                                  textInputAction: TextInputAction.done,
-                                  obscureText: !_showConfirm,
-                                  autocorrect: false,
-                                  enableSuggestions: false,
-                                  autofillHints: const [AutofillHints.password],
-                                  decoration: InputDecoration(
-                                    labelText: 'Confirm password',
-                                    isDense: true,
-                                    contentPadding: fieldPadding,
-                                    suffixIcon: IconButton(
-                                      tooltip: _showConfirm
-                                          ? 'Hide password'
-                                          : 'Show password',
-                                      icon: Icon(
-                                        _showConfirm
-                                            ? Icons.visibility_off
-                                            : Icons.visibility,
-                                      ),
-                                      onPressed: () {
-                                        _setStateIfMounted(() =>
-                                            _showConfirm = !_showConfirm);
-                                      },
-                                    ),
-                                  ),
-                                  validator: _validateConfirm,
-                                  enabled: canSubmit,
-                                  onFieldSubmitted: (_) => _submit(),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                padding: buttonPadding,
-                              ),
-                              onPressed: canSubmit ? () => _submit() : null,
-                              icon: _submitting
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : Icon(_isRegistering
-                                      ? Icons.person_add_alt_1
-                                      : Icons.login),
-                              label: Text(_isRegistering
-                                  ? 'Create account'
-                                  : 'Sign in'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 2,
-                        children: [
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              padding: textButtonPadding,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: canSubmit ? _toggleRegistering : null,
-                            child: Text(
-                              _isRegistering
-                                  ? 'Have an account? Sign in'
-                                  : 'Create an account',
-                            ),
-                          ),
-                          if (!_isRegistering)
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                padding: textButtonPadding,
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              onPressed: (!_isRegistering && canSubmit)
-                                  ? () => _sendPasswordReset()
-                                  : null,
-                              child: _resetting
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : const Text('Forgot password?'),
-                            ),
-                        ],
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                      if (_info != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _info!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+        return _EmailAuthSheet(
+          onSignedIn: _closeSignInRouteIfNeeded,
         );
       },
     );
-
-    _emailSheetSetState = null;
-    _emailSheetContext = null;
-  }
-
-  @override
-  void dispose() {
-    final sheetContext = _emailSheetContext;
-    if (sheetContext != null && sheetContext.mounted) {
-      Navigator.of(sheetContext).pop();
-    }
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmController.dispose();
-    _emailSheetSetState = null;
-    _emailSheetContext = null;
-    super.dispose();
   }
 
   @override
@@ -742,7 +359,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     final screenHeight = MediaQuery.of(context).size.height;
     final compactAppBar = screenHeight < 760;
     final tightAppBar = screenHeight < 650;
-    final canStartAuth = !_submitting && !_resetting;
+    final canStartAuth = !_submitting;
 
     return Scaffold(
       appBar: AppBar(
@@ -913,6 +530,407 @@ class _SignInPageState extends ConsumerState<SignInPage> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _EmailAuthSheet extends ConsumerStatefulWidget {
+  const _EmailAuthSheet({required this.onSignedIn});
+
+  final Future<void> Function()? onSignedIn;
+
+  @override
+  ConsumerState<_EmailAuthSheet> createState() => _EmailAuthSheetState();
+}
+
+class _EmailAuthSheetState extends ConsumerState<_EmailAuthSheet> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _isRegistering = false;
+  bool _showPassword = false;
+  bool _showConfirm = false;
+  bool _submitting = false;
+  bool _resetting = false;
+  String? _error;
+  String? _info;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  String? _validateEmail(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return 'Enter your email';
+    if (!text.contains('@') || !text.contains('.')) {
+      return 'Enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    final text = value ?? '';
+    if (text.isEmpty) return 'Enter your password';
+    if (text.length < 6) return 'Password must be at least 6 characters';
+    return null;
+  }
+
+  String? _validateConfirm(String? value) {
+    if (!_isRegistering) return null;
+    if (value == null || value.isEmpty) return 'Confirm your password';
+    if (value != _passwordController.text) return 'Passwords do not match';
+    return null;
+  }
+
+  void _toggleRegistering() {
+    setState(() {
+      _isRegistering = !_isRegistering;
+      _showConfirm = false;
+      _error = null;
+      _info = null;
+    });
+    _confirmController.clear();
+  }
+
+  Future<void> _submit() async {
+    if (_submitting || _resetting) return;
+    final auth = ref.read(firebaseAuthProvider);
+    if (auth == null) {
+      setState(() => _error = 'Auth not initialized');
+      return;
+    }
+    final valid = _formKey.currentState?.validate() ?? false;
+    if (!valid) return;
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+      _info = null;
+    });
+    FocusScope.of(context).unfocus();
+    var completed = false;
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      final currentUser = auth.currentUser;
+      if (_isRegistering) {
+        if (currentUser != null && currentUser.isAnonymous) {
+          final credential = EmailAuthProvider.credential(
+            email: email,
+            password: password,
+          );
+          await currentUser.linkWithCredential(credential);
+        } else {
+          await auth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        }
+      } else {
+        await auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      }
+      completed = true;
+      if (mounted) {
+        await Navigator.of(context).maybePop();
+      }
+      final onSignedIn = widget.onSignedIn;
+      if (onSignedIn != null) {
+        await onSignedIn();
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = _friendlyAuthError(e, includeCode: true));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Authentication failed: $e');
+    } finally {
+      if (!completed && mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    if (_submitting || _resetting) return;
+    final auth = ref.read(firebaseAuthProvider);
+    if (auth == null) {
+      setState(() => _error = 'Auth not initialized');
+      return;
+    }
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Enter your email to reset password');
+      return;
+    }
+
+    setState(() {
+      _resetting = true;
+      _error = null;
+      _info = null;
+    });
+    FocusScope.of(context).unfocus();
+    try {
+      final settings = PasswordResetLinks.buildActionCodeSettings();
+      if (settings == null) {
+        await auth.sendPasswordResetEmail(email: email);
+      } else {
+        await auth.sendPasswordResetEmail(
+          email: email,
+          actionCodeSettings: settings,
+        );
+      }
+      if (!mounted) return;
+      setState(
+        () => _info =
+            'Password reset request sent to $email. If you do not receive it, '
+            'check spam/junk or try a different email provider.',
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = _friendlyAuthError(e, includeCode: true));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Failed to send reset email: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _resetting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final isCompact = media.size.height < 700;
+    final textTheme = Theme.of(context).textTheme;
+    final fieldPadding = EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: isCompact ? 10 : 12,
+    );
+    final buttonPadding = EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: isCompact ? 10 : 12,
+    );
+    final textButtonPadding = EdgeInsets.symmetric(
+      horizontal: 8,
+      vertical: isCompact ? 0 : 4,
+    );
+    final canSubmit = !_submitting && !_resetting;
+    final titleStyle =
+        isCompact ? textTheme.titleMedium : textTheme.titleLarge;
+    final description = _isRegistering
+        ? 'Create an account to sync scores and save sessions.'
+        : 'Use your email and password to continue.';
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + media.viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SheetHandle(),
+              const SizedBox(height: 12),
+              Text(
+                _isRegistering ? 'Create account' : 'Sign in with email',
+                style: titleStyle,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              Form(
+                key: _formKey,
+                child: AutofillGroup(
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        textCapitalization: TextCapitalization.none,
+                        autofillHints: const [AutofillHints.email],
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          hintText: 'name@example.com',
+                          isDense: true,
+                          contentPadding: fieldPadding,
+                        ),
+                        validator: _validateEmail,
+                        enabled: canSubmit,
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _passwordController,
+                        textInputAction: _isRegistering
+                            ? TextInputAction.next
+                            : TextInputAction.done,
+                        obscureText: !_showPassword,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          isDense: true,
+                          contentPadding: fieldPadding,
+                          suffixIcon: IconButton(
+                            tooltip:
+                                _showPassword ? 'Hide password' : 'Show password',
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() => _showPassword = !_showPassword);
+                            },
+                          ),
+                        ),
+                        validator: _validatePassword,
+                        enabled: canSubmit,
+                        onFieldSubmitted: (_) {
+                          if (!_isRegistering) _submit();
+                        },
+                      ),
+                      if (_isRegistering) ...[
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: _confirmController,
+                          textInputAction: TextInputAction.done,
+                          obscureText: !_showConfirm,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          autofillHints: const [AutofillHints.password],
+                          decoration: InputDecoration(
+                            labelText: 'Confirm password',
+                            isDense: true,
+                            contentPadding: fieldPadding,
+                            suffixIcon: IconButton(
+                              tooltip: _showConfirm
+                                  ? 'Hide password'
+                                  : 'Show password',
+                              icon: Icon(
+                                _showConfirm
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                              ),
+                              onPressed: () {
+                                setState(() => _showConfirm = !_showConfirm);
+                              },
+                            ),
+                          ),
+                          validator: _validateConfirm,
+                          enabled: canSubmit,
+                          onFieldSubmitted: (_) => _submit(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        padding: buttonPadding,
+                      ),
+                      onPressed: canSubmit ? _submit : null,
+                      icon: _submitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              _isRegistering
+                                  ? Icons.person_add_alt_1
+                                  : Icons.login,
+                            ),
+                      label: Text(
+                        _isRegistering ? 'Create account' : 'Sign in',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 2,
+                children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: textButtonPadding,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: canSubmit ? _toggleRegistering : null,
+                    child: Text(
+                      _isRegistering
+                          ? 'Have an account? Sign in'
+                          : 'Create an account',
+                    ),
+                  ),
+                  if (!_isRegistering)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: textButtonPadding,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: (!_isRegistering && canSubmit)
+                          ? _sendPasswordReset
+                          : null,
+                      child: _resetting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Forgot password?'),
+                    ),
+                ],
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
+              if (_info != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _info!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

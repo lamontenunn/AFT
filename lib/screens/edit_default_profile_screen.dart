@@ -111,14 +111,25 @@ class _EditDefaultProfileScreenState
       return v.isEmpty ? null : v;
     }
 
+    String? capFirst(String? value) {
+      if (value == null || value.isEmpty) return null;
+      if (value.length == 1) return value.toUpperCase();
+      return value[0].toUpperCase() + value.substring(1);
+    }
+
+    final firstRaw = norm(_firstCtrl.text);
+    final lastRaw = norm(_lastCtrl.text);
+    final firstNorm = capFirst(firstRaw);
+    final lastNorm = capFirst(lastRaw);
+
     final mi = norm(_miCtrl.text);
     final miNorm = mi == null ? null : mi[0].toUpperCase();
 
     return _draft.copyWith(
-      firstName: norm(_firstCtrl.text),
-      clearFirstName: norm(_firstCtrl.text) == null,
-      lastName: norm(_lastCtrl.text),
-      clearLastName: norm(_lastCtrl.text) == null,
+      firstName: firstNorm,
+      clearFirstName: firstNorm == null,
+      lastName: lastNorm,
+      clearLastName: lastNorm == null,
       middleInitial: miNorm,
       clearMiddleInitial: miNorm == null,
       unit: norm(_unitCtrl.text),
@@ -145,6 +156,12 @@ class _EditDefaultProfileScreenState
     }
 
     await ctrl.setDefaultProfile(next);
+    final syncError = ctrl.takeProfileSyncError();
+    if (syncError != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(syncError)),
+      );
+    }
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -726,7 +743,7 @@ class _EditDefaultProfileScreenState
     final controller = TextEditingController(
       text: _draft.bodyFatPercent == null
           ? ''
-          : _draft.bodyFatPercent!.toStringAsFixed(1),
+          : _draft.bodyFatPercent!.toStringAsFixed(0),
     );
 
     String? error;
@@ -740,7 +757,7 @@ class _EditDefaultProfileScreenState
             controller: controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              hintText: 'e.g., 18.5',
+              hintText: 'e.g., 19',
               errorText: error,
             ),
             onChanged: (v) {
@@ -787,12 +804,13 @@ class _EditDefaultProfileScreenState
 
     final d = double.tryParse(res);
     if (d == null || d < 0 || d > 100) return;
-    _setDraft(_draft.copyWith(bodyFatPercent: d));
+    final rounded = d.roundToDouble();
+    _setDraft(_draft.copyWith(bodyFatPercent: rounded));
   }
 
   String _bodyFatLabel() {
     if (_draft.bodyFatPercent == null) return 'Not set';
-    return '${_draft.bodyFatPercent!.toStringAsFixed(1)}%';
+    return '${_draft.bodyFatPercent!.toStringAsFixed(0)}%';
   }
 
   Future<void> _openBodyFatCalculator() async {
@@ -819,7 +837,12 @@ class _EditDefaultProfileScreenState
     final weightCtrl = TextEditingController(
       text: weightLbs == null ? '' : weightLbs.toStringAsFixed(1),
     );
-    final abdomenCtrl = TextEditingController();
+    final abdomenCtrl1 = TextEditingController();
+    final abdomenCtrl2 = TextEditingController();
+    final abdomenCtrl3 = TextEditingController();
+    bool abd2Dirty = false;
+    bool abd3Dirty = false;
+    bool syncingAbd = false;
 
     BodyFatResult? result;
 
@@ -833,17 +856,27 @@ class _EditDefaultProfileScreenState
         builder: (ctx, setState) {
           void recompute() {
             final w = double.tryParse(weightCtrl.text.trim());
-            final a = double.tryParse(abdomenCtrl.text.trim());
-            if (w == null || a == null || w <= 0 || a <= 0) {
+            final a1 = double.tryParse(abdomenCtrl1.text.trim());
+            final a2 = double.tryParse(abdomenCtrl2.text.trim());
+            final a3 = double.tryParse(abdomenCtrl3.text.trim());
+            if (w == null ||
+                a1 == null ||
+                a2 == null ||
+                a3 == null ||
+                w <= 0 ||
+                a1 <= 0 ||
+                a2 <= 0 ||
+                a3 <= 0) {
               setState(() => result = null);
               return;
             }
+            final avg = (a1 + a2 + a3) / 3.0;
             setState(() {
               result = estimateBodyFat(
                 sex: sex,
                 age: age,
                 weightLbs: w,
-                abdomenIn: a,
+                abdomenIn: avg,
               );
             });
           }
@@ -897,6 +930,13 @@ class _EditDefaultProfileScreenState
                       },
                     ),
                     const SizedBox(height: 10),
+                    Text(
+                      'Enter three abdomen measurements (in).',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Expanded(
@@ -931,15 +971,65 @@ class _EditDefaultProfileScreenState
                       ],
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: abdomenCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Abdomen (in)',
-                        isDense: true,
-                      ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (_) => recompute(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: abdomenCtrl1,
+                            decoration: const InputDecoration(
+                              labelText: 'Measure 1',
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (value) {
+                              if (!syncingAbd) {
+                                syncingAbd = true;
+                                if (!abd2Dirty) abdomenCtrl2.text = value;
+                                if (!abd3Dirty) abdomenCtrl3.text = value;
+                                syncingAbd = false;
+                              }
+                              recompute();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: abdomenCtrl2,
+                            decoration: const InputDecoration(
+                              labelText: 'Measure 2',
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (value) {
+                              if (!syncingAbd) {
+                                abd2Dirty = value.trim().isNotEmpty;
+                              }
+                              recompute();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: abdomenCtrl3,
+                            decoration: const InputDecoration(
+                              labelText: 'Measure 3',
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (value) {
+                              if (!syncingAbd) {
+                                abd3Dirty = value.trim().isNotEmpty;
+                              }
+                              recompute();
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     if (result != null)
@@ -951,7 +1041,7 @@ class _EditDefaultProfileScreenState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Estimated BF%: ${result!.bodyFatPercent.toStringAsFixed(1)}%',
+                                'Estimated BF%: ${result!.bodyFatPercent.toStringAsFixed(0)}%',
                                 style: theme.textTheme.titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w800),
                               ),
@@ -974,7 +1064,7 @@ class _EditDefaultProfileScreenState
                       )
                     else
                       Text(
-                        'Enter age, weight, and abdomen to calculate.',
+                        'Enter age, weight, and three abdomen measurements to calculate.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),

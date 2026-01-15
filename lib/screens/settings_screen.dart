@@ -5,16 +5,13 @@ import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/screens/edit_default_profile_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Body-only settings screen. Wrapped by AftScaffold(showHeader: false).
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
-
-  static const String _supportEmail = 'contact@nunntechnologies.com';
-  static const String _standardsSource = 'AFT scoring tables (embedded)';
-  static const String _standardsVersion = 'v1';
 
   static String _displayName(DefaultProfileSettings dp) {
     final first = dp.firstName?.trim();
@@ -36,11 +33,45 @@ class SettingsScreen extends ConsumerWidget {
     return parts.join(' ');
   }
 
+  static String _accountStatusLabel(User? user) {
+    if (user == null) return 'Signed out';
+    if (user.isAnonymous) return 'Guest';
+    return 'Signed in';
+  }
+
+  static String _accountMethodLabel(User? user) {
+    if (user == null) return 'Not signed in';
+    if (user.isAnonymous) return 'Anonymous session';
+    final providerId = _primaryProviderId(user);
+    if (providerId == null) return 'Unknown';
+    return switch (providerId) {
+      'google.com' => 'Google',
+      'apple.com' => 'Apple',
+      'password' => 'Email',
+      'phone' => 'Phone',
+      'facebook.com' => 'Facebook',
+      'github.com' => 'GitHub',
+      'twitter.com' => 'X',
+      'microsoft.com' => 'Microsoft',
+      _ => 'Other',
+    };
+  }
+
+  static String? _primaryProviderId(User user) {
+    for (final info in user.providerData) {
+      if (info.providerId != 'firebase') return info.providerId;
+    }
+    return user.providerData.isNotEmpty
+        ? user.providerData.first.providerId
+        : null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final ctrl = ref.read(settingsProvider.notifier);
     final dp = settings.defaultProfile;
+    final user = ref.watch(authUserProvider);
     final packageInfoFuture = PackageInfo.fromPlatform();
 
     String ymd(DateTime d) =>
@@ -67,7 +98,7 @@ class SettingsScreen extends ConsumerWidget {
 
     String bodyFatLabel() {
       if (dp.bodyFatPercent == null) return 'Not set';
-      return '${dp.bodyFatPercent!.toStringAsFixed(1)}%';
+      return '${dp.bodyFatPercent!.toStringAsFixed(0)}%';
     }
 
     return ListView(
@@ -151,6 +182,40 @@ class SettingsScreen extends ConsumerWidget {
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit profile'),
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Account
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(
+            'Account',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Card(
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  _SummaryRow(
+                    label: 'Status',
+                    value: _accountStatusLabel(user),
+                  ),
+                  const SizedBox(height: 8),
+                  _SummaryRow(
+                    label: 'Method',
+                    value: _accountMethodLabel(user),
                   ),
                 ],
               ),
@@ -330,33 +395,13 @@ class SettingsScreen extends ConsumerWidget {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.rule_outlined),
-                  title: const Text('Standards source'),
-                  subtitle: const Text(_standardsSource),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.verified_outlined),
-                  title: const Text('Standards version'),
-                  subtitle: const Text(_standardsVersion),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.mail_outline),
-                  title: const Text('Contact support'),
-                  subtitle: const Text('Opens your email app'),
-                  onTap: () => _sendSupportEmail(
-                    context,
-                    subject: 'AFT App Support',
-                    version: version,
-                    build: build,
-                  ),
-                ),
-                ListTile(
                   leading: const Icon(Icons.lightbulb_outline),
                   title: const Text('Request a feature'),
                   subtitle: const Text('Share an idea or improvement'),
-                  onTap: () => _sendSupportEmail(
+                  onTap: () => _showFeedbackDialog(
                     context,
-                    subject: 'AFT App Feature Request',
+                    ref,
+                    kind: _FeedbackKind.feature,
                     version: version,
                     build: build,
                   ),
@@ -365,9 +410,10 @@ class SettingsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.bug_report_outlined),
                   title: const Text('Submit a bug'),
                   subtitle: const Text('Report a problem or crash'),
-                  onTap: () => _sendSupportEmail(
+                  onTap: () => _showFeedbackDialog(
                     context,
-                    subject: 'AFT App Bug Report',
+                    ref,
+                    kind: _FeedbackKind.bug,
                     version: version,
                     build: build,
                   ),
@@ -404,40 +450,218 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-Future<void> _sendSupportEmail(
-  BuildContext context, {
-  required String subject,
+enum _FeedbackKind { support, feature, bug }
+
+extension _FeedbackKindMeta on _FeedbackKind {
+  String get key {
+    return switch (this) {
+      _FeedbackKind.support => 'support',
+      _FeedbackKind.feature => 'feature',
+      _FeedbackKind.bug => 'bug',
+    };
+  }
+
+  String get dialogTitle {
+    return switch (this) {
+      _FeedbackKind.support => 'Contact support',
+      _FeedbackKind.feature => 'Request a feature',
+      _FeedbackKind.bug => 'Submit a bug',
+    };
+  }
+
+  String get prompt {
+    return switch (this) {
+      _FeedbackKind.support => 'Tell us how we can help.',
+      _FeedbackKind.feature => 'Describe the feature you would like to see.',
+      _FeedbackKind.bug => 'Describe the issue and how to reproduce it.',
+    };
+  }
+}
+
+Future<void> _showFeedbackDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  required _FeedbackKind kind,
   required String version,
   required String build,
 }) async {
-  final body = [
-    'Please describe your request below:',
-    '',
-    '---',
-    'App version: $version ($build)',
-  ].join('\n');
-  final uri = Uri(
-    scheme: 'mailto',
-    path: SettingsScreen._supportEmail,
-    queryParameters: {'subject': subject, 'body': body},
+  final submitted = await showDialog<bool>(
+    context: context,
+    builder: (_) => _FeedbackDialog(
+      kind: kind,
+      version: version,
+      build: build,
+    ),
   );
-  await _openExternalLink(context, uri);
+
+  if (submitted == true && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Thanks! Your message was sent.')),
+    );
+  }
 }
 
-Future<void> _openExternalLink(BuildContext context, Uri uri) async {
-  try {
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open link.')),
-      );
+String _feedbackErrorMessage(Object error) {
+  if (error is _FeedbackSubmitException) {
+    return error.message;
+  }
+  if (error is FirebaseException) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'Unable to submit. Please sign in again and try.';
+      case 'unavailable':
+        return 'Network unavailable. Try again later.';
     }
-  } catch (_) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open link.')),
-      );
+  }
+  return 'Unable to submit. Please try again.';
+}
+
+Future<void> _submitFeedback(
+  WidgetRef ref, {
+  required _FeedbackKind kind,
+  required String message,
+  required String version,
+  required String build,
+}) async {
+  final user = ref.read(authUserProvider);
+  if (user == null) {
+    throw _FeedbackSubmitException('Sign in required to submit.');
+  }
+
+  final platform = kIsWeb ? 'web' : defaultTargetPlatform.name;
+  await FirebaseFirestore.instance.collection('feedback').add({
+    'type': kind.key,
+    'message': message,
+    'userId': user.uid,
+    'isAnonymous': user.isAnonymous,
+    'appVersion': version,
+    'buildNumber': build,
+    'platform': platform,
+    'createdAt': FieldValue.serverTimestamp(),
+  });
+}
+
+class _FeedbackSubmitException implements Exception {
+  _FeedbackSubmitException(this.message);
+
+  final String message;
+}
+
+class _FeedbackDialog extends ConsumerStatefulWidget {
+  const _FeedbackDialog({
+    required this.kind,
+    required this.version,
+    required this.build,
+  });
+
+  final _FeedbackKind kind;
+  final String version;
+  final String build;
+
+  @override
+  ConsumerState<_FeedbackDialog> createState() => _FeedbackDialogState();
+}
+
+class _FeedbackDialogState extends ConsumerState<_FeedbackDialog> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isSubmitting = false;
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSubmit() async {
+    final trimmed = _controller.text.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _errorText = 'Please enter a message.');
+      return;
     }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorText = null;
+    });
+
+    try {
+      await _submitFeedback(
+        ref,
+        kind: widget.kind,
+        message: trimmed,
+        version: widget.version,
+        build: widget.build,
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e, stack) {
+      debugPrint('Feedback submit failed: $e');
+      debugPrintStack(stackTrace: stack);
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorText = _feedbackErrorMessage(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = _controller.text.trim();
+    final canSubmit = trimmed.isNotEmpty && !_isSubmitting;
+    return AlertDialog(
+      title: Text(widget.kind.dialogTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.kind.prompt),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              maxLines: 6,
+              minLines: 4,
+              maxLength: 1000,
+              textInputAction: TextInputAction.newline,
+              decoration: InputDecoration(
+                hintText: 'Type your message here...',
+                errorText: _errorText,
+              ),
+              onChanged: (_) {
+                if (_errorText != null) {
+                  setState(() => _errorText = null);
+                } else {
+                  setState(() {});
+                }
+              },
+            ),
+            Text(
+              'Includes app version and device platform.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed:
+              _isSubmitting ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: canSubmit ? _handleSubmit : null,
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Submit'),
+        ),
+      ],
+    );
   }
 }
 
@@ -477,8 +701,8 @@ class _PrivacyPolicyScreen extends StatelessWidget {
   const _PrivacyPolicyScreen();
 
   static const List<String> _headerLines = [
-    'Privacy Policy - AFT Pro',
-    'Last updated: January 8, 2026',
+    'Privacy Policy - AFT (Army Fitness Test)',
+    'Last updated: January 14, 2026',
   ];
 
   static const List<_PolicySection> _sections = [
@@ -507,6 +731,10 @@ class _PrivacyPolicyScreen extends StatelessWidget {
         '- We use Google Analytics to understand how the App is used and to improve performance and features.',
         '- Analytics may collect app interactions, device/app information (device model, OS version, app version), and approximate location derived from IP address.',
         '- We do not use Google crash reporting.',
+        'D. Support messages',
+        '- If you submit a support request, bug report, or feature request in the App, we collect the message and related metadata (such as app version and device platform).',
+        'E. Diagnostics data',
+        '- If a cloud sync error occurs, we collect the error code and device platform to help improve reliability.',
       ],
     ),
     _PolicySection(
@@ -516,6 +744,7 @@ class _PrivacyPolicyScreen extends StatelessWidget {
         '- Maintain authentication and account access (if you sign in).',
         '- Sync saved data across devices when you are signed in.',
         '- Improve app quality and user experience (analytics).',
+        '- Review and address support requests, bug reports, and feature suggestions.',
       ],
     ),
     _PolicySection(
@@ -525,6 +754,7 @@ class _PrivacyPolicyScreen extends StatelessWidget {
         '- Some data may be stored locally on your device (for example, preferences and saved score sets in guest mode).',
         'B. Cloud storage',
         '- If you sign in, your saved AFT data and related settings may be stored in Google cloud services (such as a cloud database) associated with your account.',
+        '- Support messages may be stored in the cloud for review and triage.',
       ],
     ),
     _PolicySection(
@@ -585,7 +815,7 @@ class _PrivacyPolicyScreen extends StatelessWidget {
     _PolicySection(
       '12. Contact',
       [
-        'If you have questions or requests related to privacy, use the in-app support options (Contact support, Request a feature, Submit a bug) to email us.',
+        'If you have questions or requests related to privacy, use the in-app support options to send us a message.',
       ],
     ),
   ];

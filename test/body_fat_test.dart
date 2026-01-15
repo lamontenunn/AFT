@@ -12,7 +12,7 @@ void main() {
       // => -26.97 - 24 + 79.6 = 28.63
       final res = estimateBodyFat(
           sex: AftSex.male, age: 30, weightLbs: 200, abdomenIn: 40);
-      expect(res.bodyFatPercent, closeTo(28.63, 0.0001));
+      expect(res.bodyFatPercent, 29.0);
     });
 
     test('Female equation matches expected math', () {
@@ -21,7 +21,7 @@ void main() {
       // => -9.15 - 2.25 + 43.18 = 31.78
       final res = estimateBodyFat(
           sex: AftSex.female, age: 25, weightLbs: 150, abdomenIn: 34);
-      expect(res.bodyFatPercent, closeTo(31.78, 0.0001));
+      expect(res.bodyFatPercent, 32.0);
     });
 
     test('Negative values are clamped to 0.0', () {

@@ -636,6 +636,12 @@ class _TimingTab extends ConsumerWidget {
         body: 'Select a participant to start timing.',
       );
     }
+    final name = selected.name?.trim();
+    final displayName =
+        (name != null && name.isNotEmpty) ? name : 'Participant';
+    final detail =
+        'Age ${selected.age} • ${selected.sex == AftSex.male ? 'Male' : 'Female'}';
+    final initials = _participantInitials(displayName);
     final segments = const [
       ButtonSegment(value: AftEvent.sdc, label: Text('SDC')),
       ButtonSegment(value: AftEvent.plank, label: Text('PLK')),
@@ -655,14 +661,35 @@ class _TimingTab extends ConsumerWidget {
     final key = ValueKey('${selected.id}:${event.name}');
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SegmentedButton<AftEvent>(
-          segments: segments,
-          selected: {event},
-          onSelectionChanged: (sel) {
-            if (sel.isEmpty) return;
-            onEventChanged(sel.first);
+        _TimingParticipantBanner(
+          initials: initials,
+          name: displayName,
+          detail: detail,
+          onClear: () {
+            ref.read(proctorSessionProvider.notifier).clearSelection();
           },
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<AftEvent>(
+            segments: segments,
+            selected: {event},
+            showSelectedIcon: false,
+            style: SegmentedButton.styleFrom(
+              textStyle: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
+              minimumSize: const Size(0, 40),
+            ),
+            onSelectionChanged: (sel) {
+              if (sel.isEmpty) return;
+              onEventChanged(sel.first);
+            },
+          ),
         ),
         const SizedBox(height: 10),
         if (event == AftEvent.pushUps)
@@ -674,6 +701,87 @@ class _TimingTab extends ConsumerWidget {
             event: event,
           ),
       ],
+    );
+  }
+}
+
+String _participantInitials(String name) {
+  final parts =
+      name.split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+  if (parts.isEmpty) return 'P';
+  final first = parts.first[0];
+  final last = parts.length > 1 ? parts.last[0] : '';
+  return (first + last).toUpperCase();
+}
+
+class _TimingParticipantBanner extends StatelessWidget {
+  const _TimingParticipantBanner({
+    required this.initials,
+    required this.name,
+    required this.detail,
+    required this.onClear,
+  });
+
+  final String initials;
+  final String name;
+  final String detail;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: ArmyColors.gold,
+            foregroundColor: Colors.black,
+            child: Text(
+              initials,
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Selected participant',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  name,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onClear,
+            child: const Text('Deselect'),
+          ),
+        ],
+      ),
     );
   }
 }
