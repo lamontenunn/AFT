@@ -36,7 +36,7 @@ double maxAllowableBodyFatPercent({required AftSex sex, required int age}) {
 /// Male: BF% = -26.97 – (0.12 × weight lbs) + (1.99 × abdomen in)
 /// Female: BF% = -9.15 – (0.015 × weight lbs) + (1.27 × abdomen in)
 ///
-/// Clamps negatives to 0.0.
+/// Clamps negatives to 0.0 and rounds to the nearest whole percent.
 BodyFatResult estimateBodyFat({
   required AftSex sex,
   required int age,
@@ -48,13 +48,14 @@ BodyFatResult estimateBodyFat({
     AftSex.female => (-9.15) - (0.015 * weightLbs) + (1.27 * abdomenIn),
   };
   final clamped = bf < 0 ? 0.0 : bf;
+  final rounded = clamped.roundToDouble();
   final max = maxAllowableBodyFatPercent(sex: sex, age: age);
   return BodyFatResult(
     sex: sex,
     age: age,
     weightLbs: weightLbs,
     abdomenIn: abdomenIn,
-    bodyFatPercent: clamped,
+    bodyFatPercent: rounded,
     maxAllowablePercent: max,
   );
 }

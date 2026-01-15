@@ -63,6 +63,7 @@ Additional docs:
 ### Settings
 
 - Defaults (profile prefill), theme, haptics, combat info toggle.
+- In-app support (feature requests, bug reports) and an in-app privacy policy.
 
 ---
 
@@ -131,6 +132,12 @@ If you want to use Firebase Auth emulator locally:
 
 1. Start the emulator suite.
 2. In the app startup (after Firebase init) call `FirebaseAuth.instance.useAuthEmulator(host, port)` in `kDebugMode`.
+
+### App Check
+
+App Check is currently disabled in the app. If you enable App Check enforcement in the
+console, Firestore reads/writes from the app will fail with permission-denied. Keep
+App Check in Monitor/Off until it is re-enabled in code.
 
 ---
 
@@ -227,6 +234,7 @@ Repository layer:
 Signed-in users sync saved sets across devices via Firestore.
 Guests store locally (SharedPreferences), and signed-out users do not store saved sets.
 Default profile settings sync to `users/{uid}` under `defaultProfile`.
+Support messages are stored in `feedback` and client diagnostics in `clientEvents`.
 Firestore rules (see `firestore.rules`) enforce schema validation and prevent
 `createdAt` changes after creation.
 

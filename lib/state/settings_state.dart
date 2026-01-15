@@ -1,14 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart' as legacy;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
 import 'package:aft_firebase_app/features/auth/providers.dart';
-import 'package:state_notifier/state_notifier.dart';
 
 enum MeasurementSystem {
   imperial,
@@ -162,32 +161,26 @@ class SettingsState {
   );
 }
 
-class SettingsController extends StateNotifier<SettingsState> {
-  SettingsController(
-    this._ref, {
+class SettingsController extends Notifier<SettingsState> {
+  SettingsController({
     SettingsState? initialState,
     bool loadOnInit = true,
     bool listenToAuthChanges = true,
-  }) : super(initialState ?? SettingsState.defaults) {
-    _loadFuture = loadOnInit ? _load() : Future.value();
-    if (listenToAuthChanges) {
-      _ref.listen<AsyncValue<User?>>(
-        firebaseUserProvider,
-        (previous, next) {
-          final auth = _ref.read(firebaseAuthProvider);
-          final user = next.asData?.value ?? auth?.currentUser;
-          _handleAuthChange(user);
-        },
-        fireImmediately: true,
-      );
-    }
-  }
+  })  : _initialState = initialState,
+        _loadOnInit = loadOnInit,
+        _listenToAuthChanges = listenToAuthChanges;
 
-  late final Future<void> _loadFuture;
+  final SettingsState? _initialState;
+  final bool _loadOnInit;
+  final bool _listenToAuthChanges;
+  bool _didListenAuth = false;
+
+  late Future<void> _loadFuture;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
   String? _activeUserId;
   String? _activeScope;
   bool _isApplyingRemote = false;
+  String? _lastProfileSyncError;
 
   static const _kHaptics = 'settings_hapticsEnabled';
   static const _kThemeMode =
@@ -233,11 +226,31 @@ class SettingsController extends StateNotifier<SettingsState> {
     _kDpBodyFat,
     _kDpUpdatedAt,
   ];
-  final Ref _ref;
+  @override
+  SettingsState build() {
+    _loadFuture = _loadOnInit ? _load() : Future.value();
+    if (_listenToAuthChanges && !_didListenAuth) {
+      _didListenAuth = true;
+      ref.listen<AsyncValue<User?>>(
+        firebaseUserProvider,
+        (previous, next) {
+          final auth = ref.read(firebaseAuthProvider);
+          final user = next.asData?.value ?? auth?.currentUser;
+          _handleAuthChange(user);
+        },
+        fireImmediately: true,
+      );
+    }
+    ref.onDispose(() {
+      _profileSub?.cancel();
+      _profileSub = null;
+    });
+    return _initialState ?? SettingsState.defaults;
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final haptics = prefs.getBool(_kHaptics);
     final themeIdx = prefs.getInt(_kThemeMode);
     final showCombatInfo = prefs.getBool(_kShowCombatInfo);
@@ -255,7 +268,7 @@ class SettingsController extends StateNotifier<SettingsState> {
         DateTime.now().millisecondsSinceEpoch,
       );
     }
-    if (!mounted) return;
+    if (!ref.mounted) return;
 
     state = state.copyWith(
       hapticsEnabled: haptics ?? SettingsState.defaults.hapticsEnabled,
@@ -271,7 +284,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   }
 
   Future<void> _handleAuthChange(User? user) async {
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final nextScope = _scopeForUser(user);
     final expectedUserId = (user == null || user.isAnonymous) ? null : user.uid;
     if (_activeScope == nextScope && _activeUserId == expectedUserId) return;
@@ -282,7 +295,7 @@ class SettingsController extends StateNotifier<SettingsState> {
       await _profileSub?.cancel();
       _profileSub = null;
       await _loadFuture;
-      if (!mounted ||
+      if (!ref.mounted ||
           _activeScope != nextScope ||
           _activeUserId != expectedUserId) {
         return;
@@ -295,7 +308,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     await _profileSub?.cancel();
     _profileSub = null;
     await _loadFuture;
-    if (!mounted ||
+    if (!ref.mounted ||
         _activeScope != nextScope ||
         _activeUserId != expectedUserId) {
       return;
@@ -304,13 +317,13 @@ class SettingsController extends StateNotifier<SettingsState> {
       await _maybeMigrateGuestProfileToUser(user.uid);
     }
     await _loadProfileForScope(nextScope, allowLegacy: true);
-    if (!mounted ||
+    if (!ref.mounted ||
         _activeScope != nextScope ||
         _activeUserId != expectedUserId) {
       return;
     }
     await _syncProfileWithFirestore(user.uid);
-    if (!mounted ||
+    if (!ref.mounted ||
         _activeScope != nextScope ||
         _activeUserId != expectedUserId) {
       return;
@@ -328,7 +341,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   Future<void> _maybeMigrateGuestProfileToUser(String uid) async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final guestScope = 'guest:$uid';
     if (!_hasScopedProfileData(prefs, guestScope)) return;
     final guestProfile = _readProfileFromPrefs(prefs, scope: guestScope);
@@ -420,7 +433,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     required bool allowLegacy,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final scopedProfile = _readProfileFromPrefs(prefs, scope: scope);
     if (_hasScopedProfileData(prefs, scope) || _profileHasData(scopedProfile)) {
       state = state.copyWith(defaultProfile: scopedProfile);
@@ -449,7 +462,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   void _listenToRemoteProfile(String uid) {
     _profileSub = _profileDoc(uid).snapshots().listen((snapshot) {
-      if (!mounted) return;
+      if (!ref.mounted) return;
       if (_activeUserId != uid || !snapshot.exists) return;
       final data = snapshot.data();
       if (data == null) return;
@@ -459,12 +472,12 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   Future<void> _syncProfileWithFirestore(String uid) async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final scope = uid;
     final localUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
 
     final doc = await _profileDoc(uid).get();
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final localProfile = state.defaultProfile;
     final data = doc.data();
     if (data == null) {
@@ -503,7 +516,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   }
 
   Future<void> _applyRemoteProfile(Map<String, dynamic> data) async {
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final profileRaw = data['defaultProfile'];
     if (profileRaw == null) return;
 
@@ -511,7 +524,7 @@ class SettingsController extends StateNotifier<SettingsState> {
         _defaultProfileFromMap(Map<String, dynamic>.from(profileRaw as Map));
     final updatedAt = _coerceDate(data['updatedAt']) ?? DateTime.now();
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final scope = _activeScope ?? _signedOutScope;
     final localUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
     if (updatedAt.millisecondsSinceEpoch <= localUpdatedAt) {
@@ -534,13 +547,55 @@ class SettingsController extends StateNotifier<SettingsState> {
     String uid,
     DefaultProfileSettings profile,
   ) async {
-    await _profileDoc(uid).set(
-      {
-        'defaultProfile': _defaultProfileToMap(profile),
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    final data = {
+      'defaultProfile': _defaultProfileToMap(profile),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    final validationErrors = _validateUserDocPayload(data);
+    final doc = _profileDoc(uid);
+    try {
+      await doc.set(
+        data,
+        SetOptions(merge: true),
+      );
+      _lastProfileSyncError = null;
+      return;
+    } on FirebaseException catch (e) {
+      _lastProfileSyncError = _profileSyncErrorMessage(e);
+      if (kDebugMode && validationErrors.isNotEmpty) {
+        debugPrint(
+          'Profile sync validation issues: ${validationErrors.join('; ')}',
+        );
+      }
+      if (kDebugMode) {
+        debugPrint('Profile sync payload types: ${_describePayloadTypes(data)}');
+      }
+      unawaited(_logProfileSyncError(
+        uid,
+        e,
+        operation: 'set',
+        validationErrors:
+            e.code == 'permission-denied' ? validationErrors : null,
+      ));
+      debugPrint('Profile sync failed: ${e.code}');
+      return;
+    } catch (e) {
+      _lastProfileSyncError =
+          'Unable to sync profile to the cloud. Saved on this device.';
+      unawaited(_logProfileSyncError(
+        uid,
+        FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unknown',
+          message: e.toString(),
+        ),
+        operation: 'set',
+      ));
+      if (kDebugMode) {
+        debugPrint('Profile sync payload types: ${_describePayloadTypes(data)}');
+      }
+      debugPrint('Profile sync failed: $e');
+    }
   }
 
   /// Default Profile setters
@@ -549,10 +604,10 @@ class SettingsController extends StateNotifier<SettingsState> {
     DateTime? updatedAt,
     bool syncRemote = true,
   }) async {
-    if (!mounted) return;
+    if (!ref.mounted) return;
     final stamp = updatedAt ?? DateTime.now();
     state = state.copyWith(defaultProfile: profile);
-    final auth = _ref.read(firebaseAuthProvider);
+    final auth = ref.read(firebaseAuthProvider);
     final currentUser = auth?.currentUser;
     final prefs = await SharedPreferences.getInstance();
     final scope = currentUser != null
@@ -575,6 +630,235 @@ class SettingsController extends StateNotifier<SettingsState> {
       DefaultProfileSettings Function(DefaultProfileSettings) updater) async {
     final next = updater(state.defaultProfile);
     await setDefaultProfile(next);
+  }
+
+  String? takeProfileSyncError() {
+    final error = _lastProfileSyncError;
+    _lastProfileSyncError = null;
+    return error;
+  }
+
+  String _profileSyncErrorMessage(FirebaseException e) {
+    switch (e.code) {
+      case 'permission-denied':
+      case 'unauthenticated':
+        return 'Saved on this device, but we could not sync to the cloud. '
+            'Please sign in again and try.';
+      case 'unavailable':
+        return 'Network unavailable. Saved on this device.';
+      default:
+        return 'Unable to sync profile to the cloud. Saved on this device.';
+    }
+  }
+
+  Future<void> _logProfileSyncError(
+    String uid,
+    FirebaseException error, {
+    required String operation,
+    List<String>? validationErrors,
+  }) async {
+    final auth = ref.read(firebaseAuthProvider);
+    final user = auth?.currentUser;
+    if (user == null || user.uid != uid) return;
+    final validationSummary = _formatValidationSummary(validationErrors);
+    final message = _combineMessages(error.message, validationSummary);
+    final safeMessage = message == null
+        ? null
+        : (message.length <= 500 ? message : message.substring(0, 500));
+    final platform = kIsWeb ? 'web' : defaultTargetPlatform.name;
+    try {
+      await FirebaseFirestore.instance.collection('clientEvents').add({
+        'type': 'profile_sync_error',
+        'userId': user.uid,
+        'isAnonymous': user.isAnonymous,
+        'operation': operation,
+        'code': error.code,
+        'message': safeMessage,
+        'platform': platform,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Profile sync error log failed: $e');
+    }
+  }
+
+  String? _combineMessages(String? primary, String? secondary) {
+    if (primary == null || primary.isEmpty) return secondary;
+    if (secondary == null || secondary.isEmpty) return primary;
+    return '$primary | $secondary';
+  }
+
+  String? _formatValidationSummary(List<String>? errors) {
+    if (errors == null || errors.isEmpty) return null;
+    const maxItems = 4;
+    final shown = errors.take(maxItems).join('; ');
+    final remaining = errors.length - maxItems;
+    final suffix = remaining > 0 ? ' (+$remaining more)' : '';
+    return 'validation: $shown$suffix';
+  }
+
+  String _describePayloadTypes(Map<String, dynamic> data) {
+    final parts = <String>[];
+    final defaultProfile = data['defaultProfile'];
+    if (defaultProfile is Map) {
+      parts.add('defaultProfile{${_describeDefaultProfileTypes(defaultProfile)}}');
+    } else {
+      parts.add('defaultProfile:${_typeLabel(defaultProfile)}');
+    }
+    parts.add('updatedAt:${_typeLabel(data['updatedAt'])}');
+    if (data.containsKey('migration')) {
+      parts.add('migration:${_typeLabel(data['migration'])}');
+    }
+    return parts.join(', ');
+  }
+
+  String _describeDefaultProfileTypes(Map<dynamic, dynamic> profile) {
+    const keys = [
+      'firstName',
+      'lastName',
+      'middleInitial',
+      'rankAbbrev',
+      'unit',
+      'mos',
+      'payGrade',
+      'onProfile',
+      'sex',
+      'birthdate',
+      'measurementSystem',
+      'height',
+      'weight',
+      'bodyFatPercent',
+    ];
+    final parts = <String>[];
+    for (final key in keys) {
+      if (profile.containsKey(key)) {
+        parts.add('$key:${_typeLabel(profile[key])}');
+      }
+    }
+    return parts.join(', ');
+  }
+
+  String _typeLabel(Object? value) {
+    if (value == null) return 'null';
+    if (value is FieldValue) return 'FieldValue';
+    return value.runtimeType.toString();
+  }
+
+  List<String> _validateUserDocPayload(Map<String, dynamic> data) {
+    const allowedTopKeys = {'defaultProfile', 'updatedAt', 'migration'};
+    final errors = <String>[];
+    for (final key in data.keys) {
+      if (!allowedTopKeys.contains(key)) {
+        errors.add('Unexpected user doc field: $key');
+      }
+    }
+
+    if (data.containsKey('updatedAt')) {
+      final updatedAt = data['updatedAt'];
+      if (updatedAt != null &&
+          updatedAt is! Timestamp &&
+          updatedAt is! FieldValue) {
+        errors.add('updatedAt must be a timestamp');
+      }
+    }
+
+    final profile = data['defaultProfile'];
+    if (profile == null) {
+      return errors;
+    }
+    if (profile is! Map) {
+      errors.add('defaultProfile must be a map');
+      return errors;
+    }
+    errors.addAll(_validateDefaultProfileMap(profile));
+    return errors;
+  }
+
+  List<String> _validateDefaultProfileMap(Map<dynamic, dynamic> profile) {
+    const allowedKeys = {
+      'firstName',
+      'lastName',
+      'middleInitial',
+      'rankAbbrev',
+      'unit',
+      'mos',
+      'payGrade',
+      'onProfile',
+      'sex',
+      'birthdate',
+      'measurementSystem',
+      'height',
+      'weight',
+      'bodyFatPercent',
+    };
+    final errors = <String>[];
+    for (final key in profile.keys) {
+      if (!allowedKeys.contains(key)) {
+        errors.add('Unexpected defaultProfile field: $key');
+      }
+    }
+
+    void checkString(String field) {
+      final value = profile[field];
+      if (value != null && value is! String) {
+        errors.add('$field must be a string');
+      }
+    }
+
+    void checkBool(String field) {
+      final value = profile[field];
+      if (value != null && value is! bool) {
+        errors.add('$field must be a boolean');
+      }
+    }
+
+    void checkSex(String field) {
+      final value = profile[field];
+      if (value == null) return;
+      if (value is! String || (value != 'male' && value != 'female')) {
+        errors.add('$field must be male or female');
+      }
+    }
+
+    void checkMeasurement(String field) {
+      final value = profile[field];
+      if (value == null) return;
+      if (value is! String || (value != 'imperial' && value != 'metric')) {
+        errors.add('$field must be imperial or metric');
+      }
+    }
+
+    void checkTimestamp(String field) {
+      final value = profile[field];
+      if (value != null && value is! Timestamp) {
+        errors.add('$field must be a timestamp');
+      }
+    }
+
+    void checkNonNegativeNumber(String field) {
+      final value = profile[field];
+      if (value == null) return;
+      if (value is! num || !value.isFinite || value < 0) {
+        errors.add('$field must be a non-negative number');
+      }
+    }
+
+    checkString('firstName');
+    checkString('lastName');
+    checkString('middleInitial');
+    checkString('rankAbbrev');
+    checkString('unit');
+    checkString('mos');
+    checkString('payGrade');
+    checkBool('onProfile');
+    checkSex('sex');
+    checkTimestamp('birthdate');
+    checkMeasurement('measurementSystem');
+    checkNonNegativeNumber('height');
+    checkNonNegativeNumber('weight');
+    checkNonNegativeNumber('bodyFatPercent');
+
+    return errors;
   }
 
   Future<void> _writeProfileToPrefs(
@@ -676,12 +960,6 @@ class SettingsController extends StateNotifier<SettingsState> {
     state = state.copyWith(themeMode: mode);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_kThemeMode, _themeModeToIndex(mode));
-  }
-
-  @override
-  void dispose() {
-    _profileSub?.cancel();
-    super.dispose();
   }
 
   /// Backwards-compatible wrappers (used by existing UI while we migrate).
@@ -877,6 +1155,4 @@ class SettingsController extends StateNotifier<SettingsState> {
 }
 
 final settingsProvider =
-    legacy.StateNotifierProvider<SettingsController, SettingsState>((ref) {
-  return SettingsController(ref);
-});
+    NotifierProvider<SettingsController, SettingsState>(SettingsController.new);

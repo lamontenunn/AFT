@@ -84,6 +84,13 @@ class ProctorSessionNotifier extends Notifier<ProctorSessionState> {
     await _persist(next);
   }
 
+  Future<void> clearSelection() async {
+    if (state.selectedId == null) return;
+    final next = state.copyWith(selectedId: null);
+    state = next;
+    await _persist(next);
+  }
+
   Future<void> updateParticipant(ProctorParticipant updated) async {
     final idx = state.roster.indexWhere((e) => e.id == updated.id);
     if (idx < 0) return;

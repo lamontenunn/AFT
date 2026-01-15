@@ -303,6 +303,8 @@ Firestore:
 
 - User data lives in users/{uid}/scoreSets (document id = ScoreSet.id).
 - Default profile settings live in users/{uid} under defaultProfile.
+- In-app feedback is stored in feedback (create-only).
+- Client diagnostics (profile sync errors) are stored in clientEvents (create-only).
 - Firestore rules enforce schema validation and prevent changes to createdAt after creation.
 
 ---
@@ -341,6 +343,9 @@ Behavior:
   is copied into the uid scope before Firestore sync.
 - For signed-in users, it syncs with Firestore users/{uid}.
 - updatedAt is used for last-write-wins resolution.
+- If cloud sync fails (permission/network), the profile is still saved locally and
+  a non-fatal message is shown to the user.
+- Sync failures are logged to Firestore clientEvents with type profile_sync_error.
 
 ---
 

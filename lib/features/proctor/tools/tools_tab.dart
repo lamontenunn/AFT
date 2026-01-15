@@ -6,11 +6,12 @@ import 'package:aft_firebase_app/features/aft/state/aft_profile.dart'
     show AftSex;
 import 'package:aft_firebase_app/features/planner/lane_planner_screen.dart';
 import 'package:aft_firebase_app/features/proctor/tools/body_fat.dart';
+import 'package:aft_firebase_app/features/proctor/tools/height_weight_chart_screen.dart';
 import 'package:aft_firebase_app/features/proctor/tools/height_weight.dart';
 import 'package:aft_firebase_app/features/proctor/tools/plate_math.dart';
 import 'package:aft_firebase_app/features/proctor/tools/plate_math_chart_screen.dart';
 import 'package:aft_firebase_app/features/proctor/state/providers.dart'
-    show selectedProctorParticipantProvider;
+    show proctorSessionProvider, selectedProctorParticipantProvider;
 import 'package:aft_firebase_app/state/settings_state.dart'
     show settingsProvider;
 import 'package:aft_firebase_app/theme/army_colors.dart';
@@ -24,7 +25,7 @@ class ProctorToolsTab extends StatefulWidget {
 }
 
 class _ProctorToolsTabState extends State<ProctorToolsTab> {
-  int _toolIndex = 0; // 0 plate, 1 body fat, 2 height/weight, 3 lane planner
+  int _toolIndex = 0; // 0 plate, 1 height/weight, 2 body fat, 3 lane planner
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +39,9 @@ class _ProctorToolsTabState extends State<ProctorToolsTab> {
         if (_toolIndex == 0)
           const _PlateMathCard()
         else if (_toolIndex == 1)
-          const _BodyFatCard()
-        else if (_toolIndex == 2)
           const _HeightWeightCard()
+        else if (_toolIndex == 2)
+          const _BodyFatCard()
         else
           const LanePlannerPanel(),
       ],
@@ -121,31 +122,31 @@ class _ToolsIconSelector extends StatelessWidget {
         const SizedBox(width: 10),
         toolButton(
           index: 1,
-          label: 'Body Fat',
-          icon: Icon(Icons.monitor_weight_outlined,
-              color: selectedIndex == 1
-                  ? Colors.black
-                  : theme.colorScheme.onSurface),
-        ),
-        const SizedBox(width: 10),
-        toolButton(
-          index: 2,
           label: 'H/W',
           icon: AftSvgIcon(
             'assets/icons/h-w.svg',
             size: 28,
             padding: const EdgeInsets.all(0),
             colorFilter: ColorFilter.mode(
-              selectedIndex == 2 ? Colors.black : theme.colorScheme.onSurface,
+              selectedIndex == 1 ? Colors.black : theme.colorScheme.onSurface,
               BlendMode.srcIn,
             ),
           ),
         ),
         const SizedBox(width: 10),
         toolButton(
+          index: 2,
+          label: 'Body Fat',
+          icon: Icon(Icons.monitor_weight_outlined,
+              color: selectedIndex == 2
+                  ? Colors.black
+                  : theme.colorScheme.onSurface),
+        ),
+        const SizedBox(width: 10),
+        toolButton(
           index: 3,
           label: 'Lane Planner',
-          icon: const Icon(Icons.view_column_outlined),
+          icon: const Icon(Icons.view_column_outlined, size: 28),
         ),
       ],
     );
@@ -252,6 +253,14 @@ class _HeightWeightCardState extends ConsumerState<_HeightWeightCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final res = _result;
+    final selected = ref.watch(selectedProctorParticipantProvider);
+    final selectedName = selected?.name?.trim();
+    final selectedLabel = (selectedName != null && selectedName.isNotEmpty)
+        ? selectedName
+        : 'Selected participant';
+    final selectedDetail = selected == null
+        ? null
+        : 'Age ${selected.age} • ${selected.sex == AftSex.male ? 'Male' : 'Female'}';
     void dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
 
     // Note: Proctor always tends to have a selected participant once roster exists,
@@ -286,16 +295,23 @@ class _HeightWeightCardState extends ConsumerState<_HeightWeightCard> {
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
+            if (selected != null) ...[
+              const SizedBox(height: 10),
+              _SelectedParticipantBanner(
+                label: selectedLabel,
+                detail: selectedDetail ?? '',
+                onClear: () {
+                  ref
+                      .read(proctorSessionProvider.notifier)
+                      .clearSelection();
+                },
+              ),
+            ],
             const SizedBox(height: 10),
-            SegmentedButton<AftSex>(
-              segments: const [
-                ButtonSegment(value: AftSex.male, label: Text('Male')),
-                ButtonSegment(value: AftSex.female, label: Text('Female')),
-              ],
-              selected: {_sex},
-              onSelectionChanged: (sel) {
-                if (sel.isEmpty) return;
-                setState(() => _sex = sel.first);
+            _SexToggle(
+              value: _sex,
+              onChanged: (next) {
+                setState(() => _sex = next);
                 _recompute();
               },
             ),
@@ -346,20 +362,44 @@ class _HeightWeightCardState extends ConsumerState<_HeightWeightCard> {
             ),
             const SizedBox(height: 12),
             if (res != null) ...[
-              _ResultRow(
-                label: 'Min weight',
-                value: '${res.minAllowedLbs} lb',
-              ),
-              _ResultRow(
-                label: 'Max screening weight',
-                value: '${res.maxAllowedLbs} lb',
+              Row(
+                children: [
+                  Expanded(
+                    child: _MetricTile(
+                      label: 'Min weight',
+                      value: '${res.minAllowedLbs} lb',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MetricTile(
+                      label: 'Max screening weight',
+                      value: '${res.maxAllowedLbs} lb',
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
-              _StatusPill(
+              _StatusBanner(
                 ok: res.isPass,
                 text: res.isPass ? 'PASS' : 'FAIL',
               ),
             ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const HeightWeightChartScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.table_chart_outlined),
+                label: const Text('Full chart'),
+              ),
+            ),
           ],
         ),
       ),
@@ -593,7 +633,12 @@ class _BodyFatCardState extends ConsumerState<_BodyFatCard> {
   AftSex _sex = AftSex.male;
   late final TextEditingController _ageCtrl;
   final _weightCtrl = TextEditingController(text: '180');
-  final _abdCtrl = TextEditingController(text: '34');
+  final _abdCtrl1 = TextEditingController(text: '34');
+  final _abdCtrl2 = TextEditingController(text: '34');
+  final _abdCtrl3 = TextEditingController(text: '34');
+  bool _abd2Dirty = false;
+  bool _abd3Dirty = false;
+  bool _syncingAbd = false;
 
   BodyFatResult? _result;
   String? _error;
@@ -630,17 +675,43 @@ class _BodyFatCardState extends ConsumerState<_BodyFatCard> {
   void dispose() {
     _ageCtrl.dispose();
     _weightCtrl.dispose();
-    _abdCtrl.dispose();
+    _abdCtrl1.dispose();
+    _abdCtrl2.dispose();
+    _abdCtrl3.dispose();
     super.dispose();
+  }
+
+  void _syncAbdFromFirst(String value) {
+    if (_syncingAbd) return;
+    _syncingAbd = true;
+    if (!_abd2Dirty) {
+      _abdCtrl2.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
+    if (!_abd3Dirty) {
+      _abdCtrl3.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
+    _syncingAbd = false;
   }
 
   void _recompute() {
     final age = int.tryParse(_ageCtrl.text.trim());
     final weight = double.tryParse(_weightCtrl.text.trim());
-    final abd = double.tryParse(_abdCtrl.text.trim());
-    if (age == null || weight == null || abd == null) {
+    final abd1 = double.tryParse(_abdCtrl1.text.trim());
+    final abd2 = double.tryParse(_abdCtrl2.text.trim());
+    final abd3 = double.tryParse(_abdCtrl3.text.trim());
+    if (age == null ||
+        weight == null ||
+        abd1 == null ||
+        abd2 == null ||
+        abd3 == null) {
       setState(() {
-        _error = 'Enter valid age, weight, and abdomen values.';
+        _error = 'Enter valid age, weight, and all abdomen values.';
         _result = null;
       });
       return;
@@ -652,36 +723,64 @@ class _BodyFatCardState extends ConsumerState<_BodyFatCard> {
       });
       return;
     }
-    if (weight <= 0 || abd <= 0) {
+    if (weight <= 0 || abd1 <= 0 || abd2 <= 0 || abd3 <= 0) {
       setState(() {
-        _error = 'Weight and abdomen must be > 0.';
+        _error = 'Weight and abdomen measurements must be > 0.';
         _result = null;
       });
       return;
     }
 
+    final abdAvg = (abd1 + abd2 + abd3) / 3.0;
     final res =
-        estimateBodyFat(sex: _sex, age: age, weightLbs: weight, abdomenIn: abd);
+        estimateBodyFat(sex: _sex, age: age, weightLbs: weight, abdomenIn: abdAvg);
     setState(() {
       _error = null;
       _result = res;
     });
   }
 
+  void _showBodyFatInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Body fat compliance'),
+        content: const Text(
+          'Soldiers who score a 465 or more on the Army Fitness Test (AFT) '
+          'are in compliance with the Army body fat standard IAW AD 2025-17 '
+          'and AR 600-9.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final res = _result;
+    final selected = ref.watch(selectedProctorParticipantProvider);
+    final selectedName = selected?.name?.trim();
+    final selectedLabel = (selectedName != null && selectedName.isNotEmpty)
+        ? selectedName
+        : 'Selected participant';
+    final selectedDetail = selected == null
+        ? null
+        : 'Age ${selected.age} • ${selected.sex == AftSex.male ? 'Male' : 'Female'}';
 
     void dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
 
-    final bfStr = res == null
-        ? '--'
-        : res.bodyFatPercent
-            .toStringAsFixed(1)
-            .replaceAll(RegExp(r'\.0$'), '.0'); // keep one decimal
+    final bfStr =
+        res == null ? '--' : res.bodyFatPercent.toStringAsFixed(0);
     final maxStr =
         res == null ? '--' : res.maxAllowablePercent.toStringAsFixed(0);
+    final bfValue = res == null ? '--' : '$bfStr%';
+    final maxValue = res == null ? '--' : '$maxStr%';
 
     return Card(
       elevation: 0,
@@ -700,6 +799,11 @@ class _BodyFatCardState extends ConsumerState<_BodyFatCard> {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Body fat compliance info',
+                  onPressed: _showBodyFatInfo,
+                  icon: const Icon(Icons.info_outline),
+                ),
+                IconButton(
                   tooltip: 'Hide keypad',
                   onPressed: dismissKeyboard,
                   icon: const Icon(Icons.keyboard_hide_outlined),
@@ -708,22 +812,27 @@ class _BodyFatCardState extends ConsumerState<_BodyFatCard> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Uses sex + age + weight (lb) + abdominal circumference (in).',
+              'Uses sex + age + weight (lb) + average of 3 abdomen measurements (in).',
               style: theme.textTheme.bodyMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
+            if (selected != null) ...[
+              const SizedBox(height: 10),
+              _SelectedParticipantBanner(
+                label: selectedLabel,
+                detail: selectedDetail ?? '',
+                onClear: () {
+                  ref
+                      .read(proctorSessionProvider.notifier)
+                      .clearSelection();
+                },
+              ),
+            ],
             const SizedBox(height: 10),
-            SegmentedButton<AftSex>(
-              segments: const [
-                ButtonSegment(value: AftSex.male, label: Text('Male')),
-                ButtonSegment(value: AftSex.female, label: Text('Female')),
-              ],
-              selected: {_sex},
-              onSelectionChanged: (sel) {
-                if (sel.isEmpty) return;
-                setState(() {
-                  _sex = sel.first;
-                });
+            _SexToggle(
+              value: _sex,
+              onChanged: (next) {
+                setState(() => _sex = next);
                 _recompute();
               },
             ),
@@ -762,31 +871,291 @@ class _BodyFatCardState extends ConsumerState<_BodyFatCard> {
               ],
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: _abdCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                  signed: false, decimal: true),
-              textInputAction: TextInputAction.done,
-              decoration: InputDecoration(
-                labelText: 'Abdomen circumference (in)',
-                isDense: true,
-                errorText: _error,
-              ),
-              onTapOutside: (_) => dismissKeyboard(),
-              onChanged: (_) => _recompute(),
-              onSubmitted: (_) => dismissKeyboard(),
+            Text(
+              'Abdomen measurements (in)',
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _abdCtrl1,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        signed: false, decimal: true),
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Measure 1',
+                      isDense: true,
+                    ),
+                    onTapOutside: (_) => dismissKeyboard(),
+                    onChanged: (value) {
+                      _syncAbdFromFirst(value);
+                      _recompute();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _abdCtrl2,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        signed: false, decimal: true),
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Measure 2',
+                      isDense: true,
+                    ),
+                    onTapOutside: (_) => dismissKeyboard(),
+                    onChanged: (value) {
+                      if (!_syncingAbd) {
+                        _abd2Dirty = value.trim().isNotEmpty;
+                      }
+                      _recompute();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _abdCtrl3,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        signed: false, decimal: true),
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Measure 3',
+                      isDense: true,
+                    ),
+                    onTapOutside: (_) => dismissKeyboard(),
+                    onChanged: (value) {
+                      if (!_syncingAbd) {
+                        _abd3Dirty = value.trim().isNotEmpty;
+                      }
+                      _recompute();
+                    },
+                    onSubmitted: (_) => dismissKeyboard(),
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _error!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
-            _ResultRow(label: 'Body fat %', value: bfStr),
-            _ResultRow(label: 'Max allowed %', value: maxStr),
+            Row(
+              children: [
+                Expanded(
+                  child: _MetricTile(
+                    label: 'Body fat %',
+                    value: bfValue,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _MetricTile(
+                    label: 'Max allowed %',
+                    value: maxValue,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 10),
             if (res != null && _error == null)
-              _StatusPill(
+              _StatusBanner(
                 ok: res.isPass,
                 text: res.isPass ? 'PASS' : 'FAIL',
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SelectedParticipantBanner extends StatelessWidget {
+  const _SelectedParticipantBanner({
+    required this.label,
+    required this.detail,
+    required this.onClear,
+  });
+
+  final String label;
+  final String detail;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.person, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                if (detail.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onClear,
+            child: const Text('Deselect'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SexToggle extends StatelessWidget {
+  const _SexToggle({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final AftSex value;
+  final ValueChanged<AftSex> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle =
+        theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800);
+
+    Widget label(IconData icon, String text) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
+          Text(text),
+        ],
+      );
+    }
+
+    return SegmentedButton<AftSex>(
+      segments: [
+        ButtonSegment(
+          value: AftSex.male,
+          label: label(Icons.male, 'Male'),
+        ),
+        ButtonSegment(
+          value: AftSex.female,
+          label: label(Icons.female, 'Female'),
+        ),
+      ],
+      selected: {value},
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        backgroundColor: theme.colorScheme.surface,
+        foregroundColor: theme.colorScheme.onSurface,
+        selectedBackgroundColor: ArmyColors.gold,
+        selectedForegroundColor: Colors.black,
+        textStyle: textStyle,
+        minimumSize: const Size(0, 44),
+        side: BorderSide(color: theme.colorScheme.outline),
+      ),
+      onSelectionChanged: (sel) {
+        if (sel.isEmpty) return;
+        onChanged(sel.first);
+      },
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({required this.ok, required this.text});
+
+  final bool ok;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = ok ? ArmyColors.gold : Colors.red;
+    final fg = ok ? Colors.black : Colors.white;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: Theme.of(context)
+            .textTheme
+            .titleMedium
+            ?.copyWith(fontWeight: FontWeight.w900, color: fg),
       ),
     );
   }

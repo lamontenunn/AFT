@@ -78,9 +78,8 @@ void main() {
 ProviderContainer _containerWithProfile(DefaultProfileSettings profile) {
   return ProviderContainer(
     overrides: [
-      settingsProvider.overrideWith((ref) {
+      settingsProvider.overrideWith(() {
         return SettingsController(
-          ref,
           initialState: SettingsState.defaults.copyWith(
             defaultProfile: profile,
           ),
