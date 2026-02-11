@@ -61,6 +61,7 @@ class _ToolsIconSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    const tileHeight = 86.0;
 
     Widget toolButton({
       required int index,
@@ -72,34 +73,69 @@ class _ToolsIconSelector extends StatelessWidget {
       final fg = selected ? Colors.black : theme.colorScheme.onSurface;
 
       return Expanded(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => onSelected(index),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: theme.colorScheme.outline),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconTheme(
-                  data: IconThemeData(color: fg, size: 22),
-                  child: icon,
+        child: SizedBox(
+          height: tileHeight,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // In very tight layouts (or large text settings), keep the
+              // buttons from overflowing by reducing spacing and font size.
+              final isTightHeight = constraints.maxHeight.isFinite &&
+                  constraints.maxHeight < tileHeight;
+              final isTightWidth =
+                  constraints.maxWidth.isFinite && constraints.maxWidth <= 86;
+              final isCompact = isTightHeight || isTightWidth;
+              final verticalPadding = isCompact ? 6.0 : 10.0;
+              final horizontalPadding = isCompact ? 4.0 : 6.0;
+              final iconSize = isCompact ? 20.0 : 28.0;
+              final spacing = isCompact ? 4.0 : 6.0;
+              final labelStyle = theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: fg,
+                fontSize: isCompact ? 12.0 : 14.0,
+                height: 1.1,
+              );
+
+              return InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => onSelected(index),
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: EdgeInsets.symmetric(
+                    vertical: verticalPadding,
+                    horizontal: horizontalPadding,
+                  ),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: theme.colorScheme.outline),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox.square(
+                        dimension: iconSize,
+                        child: IconTheme(
+                          data: IconThemeData(color: fg, size: iconSize),
+                          child: FittedBox(fit: BoxFit.contain, child: icon),
+                        ),
+                      ),
+                      SizedBox(height: spacing),
+                      Flexible(
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          softWrap: true,
+                          overflow: TextOverflow.ellipsis,
+                          style: labelStyle,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium
-                      ?.copyWith(fontWeight: FontWeight.w800, color: fg),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       );
@@ -119,7 +155,7 @@ class _ToolsIconSelector extends StatelessWidget {
             colorFilter: null,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         toolButton(
           index: 1,
           label: 'H/W',
@@ -133,7 +169,7 @@ class _ToolsIconSelector extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         toolButton(
           index: 2,
           label: 'Body Fat',
@@ -142,11 +178,11 @@ class _ToolsIconSelector extends StatelessWidget {
                   ? Colors.black
                   : theme.colorScheme.onSurface),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         toolButton(
           index: 3,
           label: 'Lane Planner',
-          icon: const Icon(Icons.view_column_outlined, size: 28),
+          icon: const Icon(Icons.view_column_outlined),
         ),
       ],
     );

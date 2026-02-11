@@ -139,6 +139,27 @@ App Check is currently disabled in the app. If you enable App Check enforcement 
 console, Firestore reads/writes from the app will fail with permission-denied. Keep
 App Check in Monitor/Off until it is re-enabled in code.
 
+### Android release signing
+
+Release builds are intentionally blocked unless a real signing key is configured.
+
+1. Copy `android/key.properties.example` to `android/key.properties`.
+2. Set these values:
+   - `storeFile` path to your `.jks` upload key file
+   - `storePassword`, `keyAlias`, `keyPassword`
+3. Build: `flutter build appbundle --release` (Play Store) or `flutter build apk --release`.
+
+`android/key.properties`, keystores, and `*.jks` are ignored by git.
+
+### Release verification checklist
+
+- `flutter analyze --no-fatal-infos`
+- `flutter test`
+- `flutter build apk --release` (or `flutter build appbundle --release`)
+- Verify App Links/Universal Links after signing:
+  - `public/.well-known/assetlinks.json` must contain the release signing cert fingerprint
+  - `public/.well-known/apple-app-site-association` must match Team ID + bundle ID
+
 ---
 
 ## 4. Project structure

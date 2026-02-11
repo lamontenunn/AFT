@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
-import 'package:aft_firebase_app/features/aft/state/aft_standard.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_inputs.dart';
 import 'package:aft_firebase_app/features/aft/state/providers.dart';
 import 'package:aft_firebase_app/features/auth/auth_state.dart';
@@ -30,6 +29,10 @@ class _LastSavedSnapshot {
 class _LastSavedSnapshotNotifier extends Notifier<_LastSavedSnapshot?> {
   @override
   _LastSavedSnapshot? build() => null;
+
+  void setSnapshot(_LastSavedSnapshot snapshot) {
+    state = snapshot;
+  }
 }
 
 final _lastSavedSnapshotProvider =
@@ -262,65 +265,6 @@ class _HomeTotalBar extends ConsumerWidget implements PreferredSizeWidget {
   }
 }
 
-class _DomainSegmentedControl extends ConsumerWidget {
-  const _DomainSegmentedControl();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(aftProfileProvider);
-    final selected = <AftStandard>{profile.standard};
-
-    return SizedBox(
-      height: 36,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: () {
-          final isCombat = profile.standard == AftStandard.combat;
-          final next = isCombat ? AftStandard.general : AftStandard.combat;
-          ref.read(aftProfileProvider.notifier).setStandard(next);
-        },
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: profile.standard == AftStandard.combat
-                ? ArmyColors.gold
-                : Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: profile.standard == AftStandard.combat
-                  ? ArmyColors.gold
-                  : Theme.of(context).colorScheme.outline,
-              width: profile.standard == AftStandard.combat ? 1.4 : 1.0,
-            ),
-            boxShadow: profile.standard == AftStandard.combat
-                ? [
-                    BoxShadow(
-                      color: ArmyColors.gold.withOpacity(0.55),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : const [],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Center(
-              child: Text(
-                'Combat',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: profile.standard == AftStandard.combat
-                          ? Colors.black
-                          : Theme.of(context).colorScheme.onSurface,
-                    ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Home-only top bar actions:
 /// - Cancel (when editing an existing saved test)
 /// - Save / Update (auth gated, enabled when total is computed)
@@ -401,7 +345,7 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
           ..setPlank(i.plank)
           ..setRun2mi(i.run2mi);
       }
-      ref.read(editingSetProvider.notifier).state = null;
+      ref.read(editingSetProvider.notifier).clearEditing();
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -449,10 +393,11 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
 
       if (editing != null) {
         await repo.updateScoreSet(userId: userId, set: set);
-        ref.read(_lastSavedSnapshotProvider.notifier).state =
-            _LastSavedSnapshot(userId: userId, signature: nowSignature);
+        ref.read(_lastSavedSnapshotProvider.notifier).setSnapshot(
+              _LastSavedSnapshot(userId: userId, signature: nowSignature),
+            );
         // Clear editing state after successful update
-        ref.read(editingSetProvider.notifier).state = null;
+        ref.read(editingSetProvider.notifier).clearEditing();
         if (context.mounted) {
           await showSavedTestDialog(
             context,
@@ -498,8 +443,9 @@ class _TopBarSaveCancelActions extends ConsumerWidget {
         }
       } else {
         await repo.saveScoreSet(userId: userId, set: set);
-        ref.read(_lastSavedSnapshotProvider.notifier).state =
-            _LastSavedSnapshot(userId: userId, signature: nowSignature);
+        ref.read(_lastSavedSnapshotProvider.notifier).setSnapshot(
+              _LastSavedSnapshot(userId: userId, signature: nowSignature),
+            );
         if (context.mounted) {
           await showSavedTestDialog(
             context,

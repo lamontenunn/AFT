@@ -7,6 +7,8 @@ class MockFirebaseAuth extends Mock implements FirebaseAuth {}
 
 class MockUser extends Mock implements User {}
 
+class MockUserMetadata extends Mock implements UserMetadata {}
+
 class MockUserCredential extends Mock implements UserCredential {}
 
 MockUser buildMockUser({
@@ -16,6 +18,11 @@ MockUser buildMockUser({
   final user = MockUser();
   when(() => user.uid).thenReturn(uid);
   when(() => user.isAnonymous).thenReturn(isAnonymous);
+  when(() => user.providerData).thenReturn(const <UserInfo>[]);
+  final meta = MockUserMetadata();
+  when(() => meta.creationTime).thenReturn(null);
+  when(() => meta.lastSignInTime).thenReturn(null);
+  when(() => user.metadata).thenReturn(meta);
   return user;
 }
 
@@ -27,15 +34,18 @@ MockUserCredential buildMockCredential(User? user) {
 
 class FakeAuthController {
   FakeAuthController({User? initialUser}) {
-    _controller = StreamController<User?>.broadcast();
+    _currentUser = initialUser;
+    _controller = StreamController<User?>.broadcast(
+      onListen: () {
+        if (_currentUser != null) {
+          _controller.add(_currentUser);
+        }
+      },
+    );
     auth = MockFirebaseAuth();
     when(() => auth.authStateChanges()).thenAnswer((_) => _controller.stream);
     when(() => auth.userChanges()).thenAnswer((_) => _controller.stream);
     when(() => auth.currentUser).thenAnswer((_) => _currentUser);
-    _currentUser = initialUser;
-    if (initialUser != null) {
-      _controller.add(initialUser);
-    }
   }
 
   late final MockFirebaseAuth auth;

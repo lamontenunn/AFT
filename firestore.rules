@@ -1,270 +1,82 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() {
+    function signedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return signedIn() && request.auth.uid == userId;
     }
 
     function isStringOrNull(value) {
       return value == null || value is string;
     }
 
-    function isLimitedStringOrNull(value, max) {
-      return value == null || (value is string && value.size() <= max);
+    function isValidFeedbackCreate() {
+      return signedIn() &&
+          request.resource.data.keys().hasOnly([
+            'type',
+            'message',
+            'userId',
+            'isAnonymous',
+            'appVersion',
+            'buildNumber',
+            'platform',
+            'createdAt',
+          ]) &&
+          request.resource.data.type in ['support', 'feature', 'bug'] &&
+          request.resource.data.message is string &&
+          request.resource.data.message.size() > 0 &&
+          request.resource.data.message.size() <= 4000 &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.isAnonymous is bool &&
+          request.resource.data.appVersion is string &&
+          request.resource.data.buildNumber is string &&
+          request.resource.data.platform is string &&
+          request.resource.data.createdAt == request.time;
     }
 
-    function isBoolOrNull(value) {
-      return value == null || value is bool;
-    }
-
-    function isServerTimestamp(value) {
-      return value == request.time;
-    }
-
-    function isTimestampOrNull(value) {
-      return value == null || value is timestamp || isServerTimestamp(value);
-    }
-
-    function isTimestamp(value) {
-      return value is timestamp || isServerTimestamp(value);
-    }
-
-    function isNullableInt(value) {
-      return value == null || value is int;
-    }
-
-    function isNullableNonNegativeInt(value) {
-      return value == null || (value is int && value >= 0);
-    }
-
-    function isNullableNonNegativeNumber(value) {
-      return value == null || (value is number && value >= 0);
-    }
-
-    function isMeasurement(value) {
-      return value == null || value in ['imperial', 'metric'];
-    }
-
-    function isSex(value) {
-      return value == null || value in ['male', 'female'];
-    }
-
-    function isStandard(value) {
-      return value == null || value in ['general', 'combat'];
-    }
-
-    function isFeedbackType(value) {
-      return value in ['support', 'feature', 'bug'];
-    }
-
-    function isClientEventType(value) {
-      return value in ['profile_sync_error'];
-    }
-
-    function isDefaultProfile(profile) {
-      return profile is map
-        && profile.keys().hasOnly([
-          'firstName',
-          'lastName',
-          'middleInitial',
-          'rankAbbrev',
-          'unit',
-          'mos',
-          'payGrade',
-          'onProfile',
-          'sex',
-          'birthdate',
-          'measurementSystem',
-          'height',
-          'weight',
-          'bodyFatPercent'
-        ])
-        && isStringOrNull(profile.firstName)
-        && isStringOrNull(profile.lastName)
-        && isStringOrNull(profile.middleInitial)
-        && isStringOrNull(profile.rankAbbrev)
-        && isStringOrNull(profile.unit)
-        && isStringOrNull(profile.mos)
-        && isStringOrNull(profile.payGrade)
-        && isBoolOrNull(profile.onProfile)
-        && isSex(profile.sex)
-        && isTimestampOrNull(profile.birthdate)
-        && isMeasurement(profile.measurementSystem)
-        && isNullableNonNegativeNumber(profile.height)
-        && isNullableNonNegativeNumber(profile.weight)
-        && isNullableNonNegativeNumber(profile.bodyFatPercent);
-    }
-
-    function isMigration(migration) {
-      return migration is map
-        && migration.keys().hasOnly(['markerId', 'expectedCount', 'updatedAt'])
-        && migration.markerId is string
-        && migration.expectedCount is int
-        && migration.expectedCount >= 0
-        && isTimestamp(migration.updatedAt);
-    }
-
-    function isUserDocFields(data) {
-      return (data.defaultProfile == null || isDefaultProfile(data.defaultProfile))
-        && isTimestampOrNull(data.updatedAt);
-    }
-
-    function isUserDocCreate(data) {
-      return data.keys().hasOnly(['defaultProfile', 'updatedAt', 'migration'])
-        && isUserDocFields(data)
-        && (data.migration == null || isMigration(data.migration));
-    }
-
-    function isUserDocUpdate(data) {
-      return ((resource == null || resource.data == null)
-          ? data.keys().hasOnly(['defaultProfile', 'updatedAt', 'migration'])
-          : request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['defaultProfile', 'updatedAt', 'migration']))
-        && isUserDocFields(data)
-        && ((resource == null || resource.data == null)
-            ? (data.migration == null || isMigration(data.migration))
-            : (!request.resource.data.diff(resource.data).affectedKeys()
-                .hasAny(['migration'])
-              || data.migration == null
-              || isMigration(data.migration)));
-    }
-
-    function isScoreProfile(profile) {
-      return profile is map
-        && profile.keys().hasOnly(['age', 'sex', 'standard', 'testDate'])
-        && profile.keys().hasAll(['age', 'sex', 'standard'])
-        && profile.age is int
-        && profile.age >= 0
-        && profile.age <= 100
-        && profile.sex in ['male', 'female']
-        && profile.standard in ['general', 'combat']
-        && isTimestampOrNull(profile.testDate);
-    }
-
-    function isScoreInputs(inputs) {
-      return inputs is map
-        && inputs.keys().hasOnly(['mdlLbs', 'pushUps', 'sdc', 'plank', 'run2mi'])
-        && isNullableNonNegativeInt(inputs.mdlLbs)
-        && isNullableNonNegativeInt(inputs.pushUps)
-        && isNullableNonNegativeInt(inputs.sdc)
-        && isNullableNonNegativeInt(inputs.plank)
-        && isNullableNonNegativeInt(inputs.run2mi);
-    }
-
-    function isScoreComputed(computed) {
-      return computed is map
-        && computed.keys().hasOnly([
-          'mdlScore',
-          'pushUpsScore',
-          'sdcScore',
-          'plankScore',
-          'run2miScore',
-          'total'
-        ])
-        && isNullableNonNegativeInt(computed.mdlScore)
-        && isNullableNonNegativeInt(computed.pushUpsScore)
-        && isNullableNonNegativeInt(computed.sdcScore)
-        && isNullableNonNegativeInt(computed.plankScore)
-        && isNullableNonNegativeInt(computed.run2miScore)
-        && isNullableNonNegativeInt(computed.total);
-    }
-
-    function isScoreSet(data, setId) {
-      return data.keys().hasOnly(['id', 'profile', 'inputs', 'computed', 'createdAt'])
-        && data.keys().hasAll(['profile', 'inputs', 'createdAt'])
-        && (!data.keys().hasAny(['id']) || data.id == setId)
-        && isTimestamp(data.createdAt)
-        && isScoreProfile(data.profile)
-        && isScoreInputs(data.inputs)
-        && (data.computed == null || isScoreComputed(data.computed));
-    }
-
-    function isFeedback(data) {
-      return data is map
-        && data.keys().hasOnly([
-          'type',
-          'message',
-          'userId',
-          'createdAt',
-          'appVersion',
-          'buildNumber',
-          'platform',
-          'isAnonymous'
-        ])
-        && data.keys().hasAll(['type', 'message', 'userId', 'createdAt'])
-        && isFeedbackType(data.type)
-        && data.message is string
-        && data.message.size() > 0
-        && data.message.size() <= 2000
-        && data.userId == request.auth.uid
-        && isTimestamp(data.createdAt)
-        && isStringOrNull(data.appVersion)
-        && isStringOrNull(data.buildNumber)
-        && isStringOrNull(data.platform)
-        && isBoolOrNull(data.isAnonymous);
-    }
-
-    function isClientEvent(data) {
-      return data is map
-        && data.keys().hasOnly([
-          'type',
-          'userId',
-          'createdAt',
-          'code',
-          'message',
-          'operation',
-          'platform',
-          'appVersion',
-          'buildNumber',
-          'isAnonymous'
-        ])
-        && data.keys().hasAll(['type', 'userId', 'createdAt'])
-        && isClientEventType(data.type)
-        && data.userId == request.auth.uid
-        && isTimestamp(data.createdAt)
-        && isLimitedStringOrNull(data.code, 64)
-        && isLimitedStringOrNull(data.message, 500)
-        && (data.operation == null || data.operation in ['update', 'set'])
-        && isLimitedStringOrNull(data.platform, 32)
-        && isLimitedStringOrNull(data.appVersion, 32)
-        && isLimitedStringOrNull(data.buildNumber, 32)
-        && isBoolOrNull(data.isAnonymous);
-    }
-
-    function isCreatedAtUnchanged() {
-      return resource != null
-        && resource.data != null
-        && (!resource.data.keys().hasAny(['createdAt'])
-          || request.resource.data.createdAt == resource.data.createdAt);
+    function isValidClientEventCreate() {
+      return signedIn() &&
+          request.resource.data.keys().hasOnly([
+            'type',
+            'userId',
+            'isAnonymous',
+            'operation',
+            'code',
+            'message',
+            'platform',
+            'createdAt',
+          ]) &&
+          request.resource.data.type is string &&
+          request.resource.data.type.size() > 0 &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.isAnonymous is bool &&
+          request.resource.data.operation is string &&
+          request.resource.data.operation.size() > 0 &&
+          request.resource.data.code is string &&
+          request.resource.data.code.size() > 0 &&
+          isStringOrNull(request.resource.data.message) &&
+          request.resource.data.platform is string &&
+          request.resource.data.createdAt == request.time;
     }
 
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isUserDocCreate(request.resource.data);
-      allow update: if isOwner(userId) && isUserDocUpdate(request.resource.data);
-      allow delete: if isOwner(userId);
+      allow read, write: if isOwner(userId);
 
       match /scoreSets/{setId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId) && isScoreSet(request.resource.data, setId);
-        allow update: if isOwner(userId)
-          && isScoreSet(request.resource.data, setId)
-          && isCreatedAtUnchanged();
-        allow delete: if isOwner(userId);
+        allow read, write: if isOwner(userId);
       }
     }
 
     match /feedback/{feedbackId} {
-      allow create: if isSignedIn() && isFeedback(request.resource.data);
+      allow create: if isValidFeedbackCreate();
       allow read, update, delete: if false;
     }
 
     match /clientEvents/{eventId} {
-      allow create: if isSignedIn() && isClientEvent(request.resource.data);
+      allow create: if isValidClientEventCreate();
       allow read, update, delete: if false;
     }
   }

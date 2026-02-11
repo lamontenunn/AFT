@@ -178,6 +178,13 @@ class _ProctorScreenState extends ConsumerState<ProctorScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: SegmentedButton<ProctorTab>(
+            showSelectedIcon: false,
+            style: SegmentedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              textStyle: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             segments: const [
               ButtonSegment(
                   value: ProctorTab.calculators, label: Text('Tools')),
@@ -1581,8 +1588,8 @@ class _TimedEventPageState extends ConsumerState<_TimedEventPage>
                   currentElapsed: elapsed,
                   overallTarget60: sdcTarget60!,
                   overallTarget100: sdcTarget100!,
-                  target60: sdcCumulativeTarget60!,
-                  target100: sdcCumulativeTarget100!,
+                  target60: sdcCumulativeTarget60,
+                  target100: sdcCumulativeTarget100,
                   onTrack60: sdcOnTrack60 ?? false,
                   onTrack100: sdcOnTrack100 ?? false,
                 )

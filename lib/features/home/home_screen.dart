@@ -358,8 +358,8 @@ class _FeatureHomeScreenState extends ConsumerState<FeatureHomeScreen> {
                 child: SizedBox(
                   height: 60,
                   child: _RankGreetingRow(
-                    rankAbbrev: rankAbbrev!,
-                    lastName: lastName!,
+                    rankAbbrev: rankAbbrev,
+                    lastName: lastName,
                   ),
                 ),
               ),

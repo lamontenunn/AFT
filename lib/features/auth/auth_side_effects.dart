@@ -5,7 +5,6 @@ import 'package:aft_firebase_app/features/auth/providers.dart';
 import 'package:aft_firebase_app/features/saves/guest_migration.dart';
 import 'package:aft_firebase_app/features/saves/editing.dart';
 import 'package:aft_firebase_app/data/repository_providers.dart';
-import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:aft_firebase_app/features/proctor/state/providers.dart';
 import 'package:aft_firebase_app/features/proctor/state/proctor_inputs.dart';
 import 'package:aft_firebase_app/features/proctor/state/proctor_ui_state.dart';
@@ -20,9 +19,8 @@ final authSideEffectsProvider = Provider<void>((ref) {
       final user = next.asData?.value;
 
       if (prevUser?.uid != user?.uid) {
-        ref.read(editingSetProvider.notifier).state = null;
+        ref.read(editingSetProvider.notifier).clearEditing();
         ref.invalidate(aftRepositoryProvider);
-        ref.invalidate(settingsProvider);
         ref.invalidate(proctorSessionProvider);
         ref.invalidate(proctorInputsStateProvider);
         ref.invalidate(proctorTimingProvider);

@@ -97,12 +97,6 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     }
   }
 
-  void _showSocialComingSoon(String provider) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$provider sign-in is coming soon.')),
-    );
-  }
-
   void _showSocialUnavailable(String provider) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$provider sign-in is unavailable on this device.')),
@@ -125,30 +119,6 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     return digest.toString();
   }
 
-  void _debugLogAppleIdTokenClaims(String idToken, String expectedNonce) {
-    assert(() {
-      try {
-        final parts = idToken.split('.');
-        if (parts.length != 3) {
-          debugPrint('Apple idToken malformed: ${parts.length} parts');
-          return true;
-        }
-        final normalized = base64Url.normalize(parts[1]);
-        final payload = utf8.decode(base64Url.decode(normalized));
-        final Map<String, dynamic> claims = jsonDecode(payload);
-        final aud = claims['aud'];
-        final iss = claims['iss'];
-        final sub = claims['sub'];
-        final nonce = claims['nonce'];
-        debugPrint('Apple idToken claims: aud=$aud iss=$iss sub=$sub nonce=$nonce');
-        debugPrint('Expected hashed nonce: $expectedNonce');
-      } catch (e) {
-        debugPrint('Failed to decode Apple idToken claims: $e');
-      }
-      return true;
-    }());
-  }
-
   bool get _isAppleSupported {
     if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.iOS ||
@@ -167,14 +137,6 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       _setStateIfMounted(() => _error = 'Auth not initialized');
       return;
     }
-
-    assert(() {
-      final app = auth.app;
-      debugPrint(
-        'Firebase app: name=${app.name} projectId=${app.options.projectId} bundleId=${app.options.iosBundleId}',
-      );
-      return true;
-    }());
 
     _setStateIfMounted(() {
       _submitting = true;
@@ -208,16 +170,12 @@ class _SignInPageState extends ConsumerState<SignInPage> {
             () => _error = 'Apple Sign-In failed to return a token.');
         return;
       }
-      _debugLogAppleIdTokenClaims(idToken, nonce);
 
       final authorizationCode = appleCredential.authorizationCode;
       final oauthCredential = OAuthProvider('apple.com').credential(
         idToken: idToken,
         rawNonce: rawNonce,
-        accessToken:
-            (authorizationCode != null && authorizationCode.isNotEmpty)
-                ? authorizationCode
-                : null,
+        accessToken: authorizationCode.isNotEmpty ? authorizationCode : null,
       );
 
       final currentUser = auth.currentUser;
@@ -239,10 +197,6 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       completed = true;
       await _closeSignInRouteIfNeeded();
     } on SignInWithAppleAuthorizationException catch (e) {
-      assert(() {
-        debugPrint('Apple sign-in authorization error: ${e.code} ${e.message}');
-        return true;
-      }());
       if (e.code == AuthorizationErrorCode.canceled) {
         _setStateIfMounted(() => _info = 'Apple sign-in canceled.');
       } else {
@@ -250,16 +204,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
             'Apple sign-in failed (${e.code.name}): ${e.message}');
       }
     } on SignInWithAppleException catch (e) {
-      assert(() {
-        debugPrint('Apple sign-in error: $e');
-        return true;
-      }());
       _setStateIfMounted(() => _error = 'Apple sign-in failed: $e');
     } on FirebaseAuthException catch (e) {
-      assert(() {
-        debugPrint('Firebase auth error: ${e.code} ${e.message}');
-        return true;
-      }());
       _setStateIfMounted(
           () => _error = _friendlyAuthError(e, includeCode: true));
     } catch (e) {

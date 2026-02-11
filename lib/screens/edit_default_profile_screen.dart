@@ -21,6 +21,20 @@ class _EditDefaultProfileScreenState
     extends ConsumerState<EditDefaultProfileScreen> {
   late DefaultProfileSettings _draft;
 
+  ProviderSubscription<SettingsState>? _settingsSub;
+  bool _isApplyingProviderUpdate = false;
+
+  bool _touchedFirstName = false;
+  bool _touchedMiddleInitial = false;
+  bool _touchedLastName = false;
+  bool _touchedUnit = false;
+  bool _touchedMos = false;
+  bool _touchedPayGrade = false;
+  bool _touchedBirthdate = false;
+  bool _touchedSex = false;
+  bool _touchedBodyComposition = false; // measurement system/height/weight
+  bool _touchedBodyFatPercent = false;
+
   static const List<String> _armyPayGrades = <String>[
     // Enlisted
     'E-1',
@@ -80,10 +94,47 @@ class _EditDefaultProfileScreenState
     _unitCtrl = TextEditingController(text: dp.unit ?? '');
     _mosCtrl = TextEditingController(text: dp.mos ?? '');
     _payGradeCtrl = TextEditingController(text: dp.payGrade ?? '');
+
+    _firstCtrl.addListener(() {
+      if (_isApplyingProviderUpdate) return;
+      _touchedFirstName = true;
+    });
+    _miCtrl.addListener(() {
+      if (_isApplyingProviderUpdate) return;
+      _touchedMiddleInitial = true;
+    });
+    _lastCtrl.addListener(() {
+      if (_isApplyingProviderUpdate) return;
+      _touchedLastName = true;
+    });
+    _unitCtrl.addListener(() {
+      if (_isApplyingProviderUpdate) return;
+      _touchedUnit = true;
+    });
+    _mosCtrl.addListener(() {
+      if (_isApplyingProviderUpdate) return;
+      _touchedMos = true;
+    });
+    _payGradeCtrl.addListener(() {
+      if (_isApplyingProviderUpdate) return;
+      _touchedPayGrade = true;
+    });
+
+    _settingsSub = ref.listenManual<SettingsState>(
+      settingsProvider,
+      (prev, next) {
+        if (!mounted) return;
+        final prevProfile = prev?.defaultProfile;
+        final nextProfile = next.defaultProfile;
+        if (identical(prevProfile, nextProfile)) return;
+        _mergeProfileFromProvider(nextProfile);
+      },
+    );
   }
 
   @override
   void dispose() {
+    _settingsSub?.close();
     _firstCtrl.dispose();
     _miCtrl.dispose();
     _lastCtrl.dispose();
@@ -91,6 +142,160 @@ class _EditDefaultProfileScreenState
     _mosCtrl.dispose();
     _payGradeCtrl.dispose();
     super.dispose();
+  }
+
+  void _syncController(TextEditingController controller, String value) {
+    if (controller.text == value) return;
+    controller
+      ..text = value
+      ..selection = TextSelection.collapsed(offset: value.length);
+  }
+
+  void _mergeProfileFromProvider(DefaultProfileSettings nextProfile) {
+    if (!mounted) return;
+
+    bool didChange = false;
+
+    // Start from our current draft (which may include in-progress edits).
+    var mergedDraft = _draft;
+
+    void mergeIfUntouched<T>({
+      required bool touched,
+      required T current,
+      required T incoming,
+      required DefaultProfileSettings Function(DefaultProfileSettings) apply,
+    }) {
+      if (touched) return;
+      if (current == incoming) return;
+      mergedDraft = apply(mergedDraft);
+      didChange = true;
+    }
+
+    _isApplyingProviderUpdate = true;
+    try {
+      // Text fields (only update if user hasn't touched them).
+      if (!_touchedFirstName) {
+        final v = nextProfile.firstName ?? '';
+        if (_firstCtrl.text != v) {
+          _syncController(_firstCtrl, v);
+          didChange = true;
+        }
+      }
+      if (!_touchedMiddleInitial) {
+        final v = nextProfile.middleInitial ?? '';
+        if (_miCtrl.text != v) {
+          _syncController(_miCtrl, v);
+          didChange = true;
+        }
+      }
+      if (!_touchedLastName) {
+        final v = nextProfile.lastName ?? '';
+        if (_lastCtrl.text != v) {
+          _syncController(_lastCtrl, v);
+          didChange = true;
+        }
+      }
+      if (!_touchedUnit) {
+        final v = nextProfile.unit ?? '';
+        if (_unitCtrl.text != v) {
+          _syncController(_unitCtrl, v);
+          didChange = true;
+        }
+      }
+      if (!_touchedMos) {
+        final v = nextProfile.mos ?? '';
+        if (_mosCtrl.text != v) {
+          _syncController(_mosCtrl, v);
+          didChange = true;
+        }
+      }
+
+      // Pay grade / rank (treated as one group since rank depends on pay grade).
+      if (!_touchedPayGrade) {
+        final v = nextProfile.payGrade ?? '';
+        if (_payGradeCtrl.text != v) {
+          _syncController(_payGradeCtrl, v);
+          didChange = true;
+        }
+        mergeIfUntouched(
+          touched: _touchedPayGrade,
+          current: _draft.payGrade,
+          incoming: nextProfile.payGrade,
+          apply: (d) => d.copyWith(
+            payGrade: nextProfile.payGrade,
+            clearPayGrade: nextProfile.payGrade == null,
+          ),
+        );
+        mergeIfUntouched(
+          touched: _touchedPayGrade,
+          current: _draft.rankAbbrev,
+          incoming: nextProfile.rankAbbrev,
+          apply: (d) => d.copyWith(
+            rankAbbrev: nextProfile.rankAbbrev,
+            clearRankAbbrev: nextProfile.rankAbbrev == null,
+          ),
+        );
+      }
+
+      // Fields not shown on this screen: always keep in sync with provider so
+      // saving other fields cannot accidentally overwrite them.
+      if (_draft.onProfile != nextProfile.onProfile) {
+        mergedDraft = mergedDraft.copyWith(onProfile: nextProfile.onProfile);
+        didChange = true;
+      }
+
+      mergeIfUntouched(
+        touched: _touchedBirthdate,
+        current: _draft.birthdate,
+        incoming: nextProfile.birthdate,
+        apply: (d) => d.copyWith(
+          birthdate: nextProfile.birthdate,
+          clearBirthdate: nextProfile.birthdate == null,
+        ),
+      );
+      mergeIfUntouched(
+        touched: _touchedSex,
+        current: _draft.sex,
+        incoming: nextProfile.sex,
+        apply: (d) => d.copyWith(
+          sex: nextProfile.sex,
+          clearSex: nextProfile.sex == null,
+        ),
+      );
+
+      // Measurement system + height + weight must be updated together to avoid
+      // unit mismatches.
+      if (!_touchedBodyComposition) {
+        if (_draft.measurementSystem != nextProfile.measurementSystem ||
+            _draft.height != nextProfile.height ||
+            _draft.weight != nextProfile.weight) {
+          mergedDraft = mergedDraft.copyWith(
+            measurementSystem: nextProfile.measurementSystem,
+            height: nextProfile.height,
+            clearHeight: nextProfile.height == null,
+            weight: nextProfile.weight,
+            clearWeight: nextProfile.weight == null,
+          );
+          didChange = true;
+        }
+      }
+
+      mergeIfUntouched(
+        touched: _touchedBodyFatPercent,
+        current: _draft.bodyFatPercent,
+        incoming: nextProfile.bodyFatPercent,
+        apply: (d) => d.copyWith(
+          bodyFatPercent: nextProfile.bodyFatPercent,
+          clearBodyFatPercent: nextProfile.bodyFatPercent == null,
+        ),
+      );
+    } finally {
+      _isApplyingProviderUpdate = false;
+    }
+
+    if (!didChange) return;
+
+    setState(() => _draft = mergedDraft);
   }
 
   String _ymd(DateTime d) =>
@@ -386,16 +591,20 @@ class _EditDefaultProfileScreenState
       helpText: 'Select birthdate',
     );
     if (picked != null) {
+      _touchedBirthdate = true;
       _setDraft(_draft.copyWith(birthdate: picked));
     }
   }
 
   void _clearBirthdate() {
+    _touchedBirthdate = true;
     _setDraft(_draft.copyWith(clearBirthdate: true));
   }
 
   void _toggleMeasurementSystem(MeasurementSystem next) {
     if (next == _draft.measurementSystem) return;
+
+    _touchedBodyComposition = true;
 
     double? height = _draft.height;
     double? weight = _draft.weight;
@@ -462,6 +671,7 @@ class _EditDefaultProfileScreenState
       );
 
       if (res == null) return;
+      _touchedBodyComposition = true;
       if (res.isEmpty) {
         _setDraft(_draft.copyWith(clearHeight: true));
         return;
@@ -669,6 +879,7 @@ class _EditDefaultProfileScreenState
     );
 
     if (picked == null) return;
+    _touchedBodyComposition = true;
     if (picked.isEmpty) {
       _setDraft(_draft.copyWith(clearHeight: true));
       return;
@@ -723,6 +934,7 @@ class _EditDefaultProfileScreenState
       ),
     );
     if (res == null) return;
+    _touchedBodyComposition = true;
     if (res.isEmpty) {
       _setDraft(_draft.copyWith(clearWeight: true));
       return;
@@ -797,6 +1009,7 @@ class _EditDefaultProfileScreenState
     );
 
     if (res == null) return;
+    _touchedBodyFatPercent = true;
     if (res.isEmpty) {
       _setDraft(_draft.copyWith(clearBodyFatPercent: true));
       return;
@@ -1079,14 +1292,15 @@ class _EditDefaultProfileScreenState
                         ),
                         const Spacer(),
                         FilledButton.icon(
-                          onPressed: result == null
-                              ? null
-                              : () {
-                                  _setDraft(_draft.copyWith(
-                                    bodyFatPercent: result!.bodyFatPercent,
-                                  ));
-                                  Navigator.of(ctx).pop();
-                                },
+	                          onPressed: result == null
+	                              ? null
+	                              : () {
+	                                  _touchedBodyFatPercent = true;
+	                                  _setDraft(_draft.copyWith(
+	                                    bodyFatPercent: result!.bodyFatPercent,
+	                                  ));
+	                                  Navigator.of(ctx).pop();
+	                                },
                           icon: const Icon(Icons.check),
                           label: const Text('Apply'),
                         ),
@@ -1277,6 +1491,7 @@ class _EditDefaultProfileScreenState
               selected: {_draft.sex ?? AftSex.male},
               onSelectionChanged: (sel) {
                 if (sel.isEmpty) return;
+                _touchedSex = true;
                 _setDraft(_draft.copyWith(sex: sel.first));
               },
             ),

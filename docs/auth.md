@@ -395,6 +395,16 @@ Typical causes:
 - email-already-in-use means the user should use the Sign in flow instead of Create account.
 - wrong-password or user-not-found indicates invalid credentials.
 
+### Firestore permission-denied during profile sync
+
+Common causes:
+
+- App Check enforcement is enabled in the console while the client App Check
+  integration is disabled. Set App Check for Firestore to Monitor/Off until
+  it is re-enabled in code.
+- Firestore rules were updated locally but not deployed.
+- The write path is not scoped to users/{uid} where uid == request.auth.uid.
+
 ---
 
 ## Extension points / how to change auth safely
