@@ -8,18 +8,43 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def isReleaseBuild = gradle.startParameter.taskNames.any {
+    it.toLowerCase().contains("release")
+}
+if (isReleaseBuild && !keystorePropertiesFile.exists()) {
+    throw new GradleException(
+        "Missing android/key.properties for release signing. " +
+        "Create it from android/key.properties.example."
+    )
+}
+
 android {
     namespace = "com.lamontenunn.aftpro"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = "17"
+    }
+
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties["keyAlias"]
+            keyPassword keystoreProperties["keyPassword"]
+            storeFile keystoreProperties["storeFile"] ? file(keystoreProperties["storeFile"]) : null
+            storePassword keystoreProperties["storePassword"]
+        }
     }
 
     defaultConfig {
@@ -35,9 +60,7 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
         }
     }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aft_firebase_app/state/settings_state.dart';
 import 'package:aft_firebase_app/features/aft/state/aft_profile.dart';
@@ -101,9 +102,19 @@ class SettingsScreen extends ConsumerWidget {
       return '${dp.bodyFatPercent!.toStringAsFixed(0)}%';
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        await ctrl.refreshProfileFromCloud();
+        final syncError = ctrl.takeProfileSyncError();
+        if (syncError != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(syncError)),
+          );
+        }
+      },
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        children: [
         // Profile (read-only)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -372,7 +383,7 @@ class SettingsScreen extends ConsumerWidget {
                             const Text('Made by Nunn Technologies'),
                             const SizedBox(height: 8),
                             Text(
-                              'Not affiliated with or endorsed by the U.S. Army or Department of Defense.',
+                              'Not affiliated with or endorsed by the U.S. Army or Department of War.',
                               style: Theme.of(ctx)
                                   .textTheme
                                   .bodySmall
@@ -435,7 +446,8 @@ class SettingsScreen extends ConsumerWidget {
           },
         ),
         const SizedBox(height: 12),
-      ],
+        ],
+      ),
     );
   }
 
@@ -596,9 +608,7 @@ class _FeedbackDialogState extends ConsumerState<_FeedbackDialog> {
       if (mounted) {
         Navigator.of(context).pop(true);
       }
-    } catch (e, stack) {
-      debugPrint('Feedback submit failed: $e');
-      debugPrintStack(stackTrace: stack);
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;

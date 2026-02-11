@@ -234,8 +234,9 @@ class SavedSetsScreen extends ConsumerWidget {
                       inp.setPlank(i.plank);
                       inp.setRun2mi(i.run2mi);
 
-                      ref.read(editingSetProvider.notifier).state =
-                          ScoreEditing(id: set.id, createdAt: set.createdAt);
+                      ref.read(editingSetProvider.notifier).setEditing(
+                            ScoreEditing(id: set.id, createdAt: set.createdAt),
+                          );
                       if (context.mounted) {
                         Navigator.pushReplacementNamed(context, Routes.home);
                       }
@@ -288,8 +289,9 @@ class SavedSetsScreen extends ConsumerWidget {
                       inp.setPlank(i.plank);
                       inp.setRun2mi(i.run2mi);
                       // Stash editing context and navigate home
-                      ref.read(editingSetProvider.notifier).state =
-                          ScoreEditing(id: set.id, createdAt: set.createdAt);
+                      ref.read(editingSetProvider.notifier).setEditing(
+                            ScoreEditing(id: set.id, createdAt: set.createdAt),
+                          );
                       if (context.mounted) {
                         // Use replacement to switch tabs; popping can leave a blank screen
                         Navigator.pushReplacementNamed(context, Routes.home);

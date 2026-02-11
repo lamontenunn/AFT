@@ -10,6 +10,14 @@ class ScoreEditing {
 class EditingSetNotifier extends Notifier<ScoreEditing?> {
   @override
   ScoreEditing? build() => null;
+
+  void setEditing(ScoreEditing editing) {
+    state = editing;
+  }
+
+  void clearEditing() {
+    state = null;
+  }
 }
 
 /// Holds the current editing context, or null if not editing.

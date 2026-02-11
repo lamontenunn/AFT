@@ -165,6 +165,7 @@ Cause: Firestore rules too permissive (rules file updated, not yet deployed).
 Mitigation (partial):
 	•	Rules file restricts access by uid; deploy still required.
 	•	Schema validation still pending.
+	•	App Check is disabled in the client; keep App Check enforcement in Monitor/Off.
 
 ⸻
 

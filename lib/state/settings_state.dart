@@ -177,6 +177,8 @@ class SettingsController extends Notifier<SettingsState> {
 
   late Future<void> _loadFuture;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _profileSub;
+  Timer? _profileSyncRetryTimer;
+  int _profileSyncRetryCount = 0;
   String? _activeUserId;
   String? _activeScope;
   bool _isApplyingRemote = false;
@@ -244,8 +246,35 @@ class SettingsController extends Notifier<SettingsState> {
     ref.onDispose(() {
       _profileSub?.cancel();
       _profileSub = null;
+      _profileSyncRetryTimer?.cancel();
+      _profileSyncRetryTimer = null;
     });
     return _initialState ?? SettingsState.defaults;
+  }
+
+  void _resetProfileSyncRetry() {
+    _profileSyncRetryTimer?.cancel();
+    _profileSyncRetryTimer = null;
+    _profileSyncRetryCount = 0;
+  }
+
+  static const int _maxProfileSyncRetries = 6;
+
+  void _scheduleProfileSyncRetry(String uid) {
+    if (!ref.mounted) return;
+    if (_activeUserId != uid) return;
+    if (_profileSyncRetryTimer != null) return;
+    if (_profileSyncRetryCount >= _maxProfileSyncRetries) return;
+
+    final delay = Duration(milliseconds: 600 * (1 << _profileSyncRetryCount));
+    _profileSyncRetryCount += 1;
+    _profileSyncRetryTimer = Timer(delay, () {
+      _profileSyncRetryTimer = null;
+      if (!ref.mounted) return;
+      if (_activeUserId != uid) return;
+      unawaited(_syncProfileWithFirestore(uid));
+      _restartRemoteProfileListener(uid);
+    });
   }
 
   Future<void> _load() async {
@@ -289,6 +318,7 @@ class SettingsController extends Notifier<SettingsState> {
     final expectedUserId = (user == null || user.isAnonymous) ? null : user.uid;
     if (_activeScope == nextScope && _activeUserId == expectedUserId) return;
     _activeScope = nextScope;
+    _resetProfileSyncRetry();
 
     if (user == null || user.isAnonymous) {
       _activeUserId = expectedUserId;
@@ -313,7 +343,7 @@ class SettingsController extends Notifier<SettingsState> {
         _activeUserId != expectedUserId) {
       return;
     }
-    if (user != null && !user.isAnonymous) {
+    if (!user.isAnonymous) {
       await _maybeMigrateGuestProfileToUser(user.uid);
     }
     await _loadProfileForScope(nextScope, allowLegacy: true);
@@ -461,13 +491,44 @@ class SettingsController extends Notifier<SettingsState> {
   }
 
   void _listenToRemoteProfile(String uid) {
-    _profileSub = _profileDoc(uid).snapshots().listen((snapshot) {
-      if (!ref.mounted) return;
-      if (_activeUserId != uid || !snapshot.exists) return;
-      final data = snapshot.data();
-      if (data == null) return;
-      _applyRemoteProfile(data);
-    });
+    _profileSub = _profileDoc(uid).snapshots().listen(
+      (snapshot) {
+        if (!ref.mounted) return;
+        if (_activeUserId != uid || !snapshot.exists) return;
+        final data = snapshot.data();
+        if (data == null) return;
+        _lastProfileSyncError = null;
+        _resetProfileSyncRetry();
+        _applyRemoteProfile(data);
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!ref.mounted) return;
+        if (_activeUserId != uid) return;
+        unawaited(_profileSub?.cancel());
+        _profileSub = null;
+        if (error is FirebaseException) {
+          _lastProfileSyncError = _profileSyncErrorMessage(error);
+          unawaited(_logProfileSyncError(
+            uid,
+            error,
+            operation: 'listen',
+          ));
+          _scheduleProfileSyncRetry(uid);
+        } else {
+          _lastProfileSyncError =
+              'Unable to sync profile from the cloud. Showing device data.';
+          _scheduleProfileSyncRetry(uid);
+        }
+      },
+    );
+  }
+
+  void _restartRemoteProfileListener(String uid) {
+    if (!ref.mounted) return;
+    if (_activeUserId != uid) return;
+    unawaited(_profileSub?.cancel());
+    _profileSub = null;
+    _listenToRemoteProfile(uid);
   }
 
   Future<void> _syncProfileWithFirestore(String uid) async {
@@ -476,12 +537,50 @@ class SettingsController extends Notifier<SettingsState> {
     final scope = uid;
     final localUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
 
-    final doc = await _profileDoc(uid).get();
+    DocumentSnapshot<Map<String, dynamic>> doc;
+    final docRef = _profileDoc(uid);
+    try {
+      doc = await docRef.get(const GetOptions(source: Source.server));
+    } on FirebaseException catch (e) {
+      if (e.code == 'unauthenticated' || e.code == 'permission-denied') {
+        final auth = ref.read(firebaseAuthProvider);
+        final user = auth?.currentUser;
+        if (user != null && user.uid == uid) {
+          try {
+            await user.getIdToken(true);
+            doc = await docRef.get(const GetOptions(source: Source.server));
+          } on FirebaseException {
+            // Fall through to cache/default fallback below.
+          }
+        }
+      }
+
+      try {
+        doc = await docRef.get();
+      } on FirebaseException catch (fallbackError) {
+        _lastProfileSyncError = _profileSyncErrorMessage(fallbackError);
+        unawaited(_logProfileSyncError(
+          uid,
+          fallbackError,
+          operation: 'read',
+        ));
+        _scheduleProfileSyncRetry(uid);
+        return;
+      }
+    } catch (e) {
+      _lastProfileSyncError =
+          'Unable to sync profile from the cloud. Showing device data.';
+      _scheduleProfileSyncRetry(uid);
+      return;
+    }
     if (!ref.mounted) return;
+    _lastProfileSyncError = null;
+    _resetProfileSyncRetry();
     final localProfile = state.defaultProfile;
+    final localHasData = _profileHasData(localProfile);
     final data = doc.data();
     if (data == null) {
-      if (localUpdatedAt > 0 || _profileHasData(localProfile)) {
+      if (localUpdatedAt > 0 || localHasData) {
         await _pushProfileToFirestore(uid, localProfile);
       }
       return;
@@ -489,7 +588,7 @@ class SettingsController extends Notifier<SettingsState> {
 
     final remoteProfileRaw = data['defaultProfile'];
     if (remoteProfileRaw == null) {
-      if (localUpdatedAt > 0 || _profileHasData(localProfile)) {
+      if (localUpdatedAt > 0 || localHasData) {
         await _pushProfileToFirestore(uid, localProfile);
       }
       return;
@@ -498,11 +597,19 @@ class SettingsController extends Notifier<SettingsState> {
     final remoteProfile = _defaultProfileFromMap(
       Map<String, dynamic>.from(remoteProfileRaw as Map),
     );
+    final remoteHasData = _profileHasData(remoteProfile);
     final remoteUpdatedAt =
         _coerceDate(data['updatedAt'])?.millisecondsSinceEpoch ?? 0;
 
+    // Safety: never overwrite a non-empty remote profile with an empty local one.
+    // This can happen if local prefs are cleared/mismatched or device time is skewed.
+    if (remoteHasData && !localHasData) {
+      await _applyRemoteProfile(data);
+      return;
+    }
+
     if (localUpdatedAt == 0) {
-      if (_profileHasData(remoteProfile)) {
+      if (remoteHasData) {
         await _applyRemoteProfile(data);
       }
       return;
@@ -510,8 +617,24 @@ class SettingsController extends Notifier<SettingsState> {
 
     if (remoteUpdatedAt > localUpdatedAt) {
       await _applyRemoteProfile(data);
-    } else if (localUpdatedAt > remoteUpdatedAt) {
-      await _pushProfileToFirestore(uid, localProfile);
+      return;
+    }
+
+    if (remoteHasData && localHasData) {
+      final merged = _mergeProfilesPreferLocal(localProfile, remoteProfile);
+      if (!_profilesEqual(merged, localProfile)) {
+        final stampMillis =
+            localUpdatedAt > remoteUpdatedAt ? localUpdatedAt : remoteUpdatedAt;
+        await setDefaultProfile(
+          merged,
+          updatedAt: DateTime.fromMillisecondsSinceEpoch(stampMillis),
+          syncRemote: false,
+        );
+      }
+    }
+
+    if (localUpdatedAt > remoteUpdatedAt && localHasData) {
+      await _pushProfileToFirestore(uid, state.defaultProfile);
     }
   }
 
@@ -528,6 +651,21 @@ class SettingsController extends Notifier<SettingsState> {
     final scope = _activeScope ?? _signedOutScope;
     final localUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
     if (updatedAt.millisecondsSinceEpoch <= localUpdatedAt) {
+      final localProfile = state.defaultProfile;
+      final merged = _mergeProfilesPreferLocal(localProfile, profile);
+      if (_profilesEqual(merged, localProfile)) {
+        return;
+      }
+      _isApplyingRemote = true;
+      try {
+        await setDefaultProfile(
+          merged,
+          updatedAt: DateTime.fromMillisecondsSinceEpoch(localUpdatedAt),
+          syncRemote: false,
+        );
+      } finally {
+        _isApplyingRemote = false;
+      }
       return;
     }
 
@@ -547,37 +685,47 @@ class SettingsController extends Notifier<SettingsState> {
     String uid,
     DefaultProfileSettings profile,
   ) async {
-    final data = {
-      'defaultProfile': _defaultProfileToMap(profile),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-    final validationErrors = _validateUserDocPayload(data);
+    final profilePatch = _defaultProfileToMergeMap(profile);
+    if (profilePatch.isEmpty) return;
     final doc = _profileDoc(uid);
     try {
-      await doc.set(
-        data,
-        SetOptions(merge: true),
-      );
+      final update = <String, Object?>{
+        for (final entry in profilePatch.entries)
+          'defaultProfile.${entry.key}': entry.value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      await doc.update(update);
       _lastProfileSyncError = null;
       return;
     } on FirebaseException catch (e) {
+      if (e.code == 'not-found') {
+        final createData = {
+          'defaultProfile': _defaultProfileToMap(profile),
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        final validationErrors = _validateUserDocPayload(createData);
+        try {
+          await doc.set(createData, SetOptions(merge: true));
+          _lastProfileSyncError = null;
+          return;
+        } on FirebaseException catch (createError) {
+          _lastProfileSyncError = _profileSyncErrorMessage(createError);
+          unawaited(_logProfileSyncError(
+            uid,
+            createError,
+            operation: 'set',
+            validationErrors:
+                createError.code == 'permission-denied' ? validationErrors : null,
+          ));
+          return;
+        }
+      }
       _lastProfileSyncError = _profileSyncErrorMessage(e);
-      if (kDebugMode && validationErrors.isNotEmpty) {
-        debugPrint(
-          'Profile sync validation issues: ${validationErrors.join('; ')}',
-        );
-      }
-      if (kDebugMode) {
-        debugPrint('Profile sync payload types: ${_describePayloadTypes(data)}');
-      }
       unawaited(_logProfileSyncError(
         uid,
         e,
-        operation: 'set',
-        validationErrors:
-            e.code == 'permission-denied' ? validationErrors : null,
+        operation: 'merge',
       ));
-      debugPrint('Profile sync failed: ${e.code}');
       return;
     } catch (e) {
       _lastProfileSyncError =
@@ -589,12 +737,71 @@ class SettingsController extends Notifier<SettingsState> {
           code: 'unknown',
           message: e.toString(),
         ),
-        operation: 'set',
+        operation: 'merge',
       ));
-      if (kDebugMode) {
-        debugPrint('Profile sync payload types: ${_describePayloadTypes(data)}');
+    }
+  }
+
+  Future<void> _pushProfileDeltaToFirestore(
+    String uid,
+    DefaultProfileSettings previous,
+    DefaultProfileSettings next,
+  ) async {
+    final patch = _defaultProfileDeltaPatch(previous, next);
+    if (patch.isEmpty) return;
+
+    final data = {
+      ...patch,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    final doc = _profileDoc(uid);
+    try {
+      await doc.update(data);
+      _lastProfileSyncError = null;
+      return;
+    } on FirebaseException catch (e) {
+      if (e.code == 'not-found') {
+        final createData = {
+          'defaultProfile': _defaultProfileToMap(next),
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        final validationErrors = _validateUserDocPayload(createData);
+        try {
+          await doc.set(createData, SetOptions(merge: true));
+          _lastProfileSyncError = null;
+          return;
+        } on FirebaseException catch (createError) {
+          _lastProfileSyncError = _profileSyncErrorMessage(createError);
+          unawaited(_logProfileSyncError(
+            uid,
+            createError,
+            operation: 'set',
+            validationErrors:
+                createError.code == 'permission-denied' ? validationErrors : null,
+          ));
+          return;
+        }
       }
-      debugPrint('Profile sync failed: $e');
+
+      _lastProfileSyncError = _profileSyncErrorMessage(e);
+      unawaited(_logProfileSyncError(
+        uid,
+        e,
+        operation: 'delta',
+      ));
+      return;
+    } catch (e) {
+      _lastProfileSyncError =
+          'Unable to sync profile to the cloud. Saved on this device.';
+      unawaited(_logProfileSyncError(
+        uid,
+        FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unknown',
+          message: e.toString(),
+        ),
+        operation: 'delta',
+      ));
     }
   }
 
@@ -606,6 +813,7 @@ class SettingsController extends Notifier<SettingsState> {
   }) async {
     if (!ref.mounted) return;
     final stamp = updatedAt ?? DateTime.now();
+    final previous = state.defaultProfile;
     state = state.copyWith(defaultProfile: profile);
     final auth = ref.read(firebaseAuthProvider);
     final currentUser = auth?.currentUser;
@@ -621,7 +829,7 @@ class SettingsController extends Notifier<SettingsState> {
     );
     if (syncRemote && !_isApplyingRemote) {
       if (currentUser != null && !currentUser.isAnonymous) {
-        await _pushProfileToFirestore(currentUser.uid, profile);
+        await _pushProfileDeltaToFirestore(currentUser.uid, previous, profile);
       }
     }
   }
@@ -630,6 +838,21 @@ class SettingsController extends Notifier<SettingsState> {
       DefaultProfileSettings Function(DefaultProfileSettings) updater) async {
     final next = updater(state.defaultProfile);
     await setDefaultProfile(next);
+  }
+
+  Future<void> refreshProfileFromCloud() async {
+    final auth = ref.read(firebaseAuthProvider);
+    final user = auth?.currentUser;
+    if (!ref.mounted) return;
+    if (user == null || user.isAnonymous) return;
+    final uid = user.uid;
+    _activeScope = uid;
+    _activeUserId = uid;
+    await _syncProfileWithFirestore(uid);
+    if (!ref.mounted) return;
+    if (_profileSub == null) {
+      _listenToRemoteProfile(uid);
+    }
   }
 
   String? takeProfileSyncError() {
@@ -677,9 +900,7 @@ class SettingsController extends Notifier<SettingsState> {
         'platform': platform,
         'createdAt': FieldValue.serverTimestamp(),
       });
-    } catch (e) {
-      debugPrint('Profile sync error log failed: $e');
-    }
+    } catch (_) {}
   }
 
   String? _combineMessages(String? primary, String? secondary) {
@@ -695,53 +916,6 @@ class SettingsController extends Notifier<SettingsState> {
     final remaining = errors.length - maxItems;
     final suffix = remaining > 0 ? ' (+$remaining more)' : '';
     return 'validation: $shown$suffix';
-  }
-
-  String _describePayloadTypes(Map<String, dynamic> data) {
-    final parts = <String>[];
-    final defaultProfile = data['defaultProfile'];
-    if (defaultProfile is Map) {
-      parts.add('defaultProfile{${_describeDefaultProfileTypes(defaultProfile)}}');
-    } else {
-      parts.add('defaultProfile:${_typeLabel(defaultProfile)}');
-    }
-    parts.add('updatedAt:${_typeLabel(data['updatedAt'])}');
-    if (data.containsKey('migration')) {
-      parts.add('migration:${_typeLabel(data['migration'])}');
-    }
-    return parts.join(', ');
-  }
-
-  String _describeDefaultProfileTypes(Map<dynamic, dynamic> profile) {
-    const keys = [
-      'firstName',
-      'lastName',
-      'middleInitial',
-      'rankAbbrev',
-      'unit',
-      'mos',
-      'payGrade',
-      'onProfile',
-      'sex',
-      'birthdate',
-      'measurementSystem',
-      'height',
-      'weight',
-      'bodyFatPercent',
-    ];
-    final parts = <String>[];
-    for (final key in keys) {
-      if (profile.containsKey(key)) {
-        parts.add('$key:${_typeLabel(profile[key])}');
-      }
-    }
-    return parts.join(', ');
-  }
-
-  String _typeLabel(Object? value) {
-    if (value == null) return 'null';
-    if (value is FieldValue) return 'FieldValue';
-    return value.runtimeType.toString();
   }
 
   List<String> _validateUserDocPayload(Map<String, dynamic> data) {
@@ -1075,6 +1249,60 @@ class SettingsController extends Notifier<SettingsState> {
     return false;
   }
 
+  bool _profilesEqual(DefaultProfileSettings a, DefaultProfileSettings b) {
+    String? norm(String? value) => _emptyToNull(value);
+
+    bool sameDate(DateTime? x, DateTime? y) {
+      if (x == null || y == null) return x == y;
+      return x.millisecondsSinceEpoch == y.millisecondsSinceEpoch;
+    }
+
+    return norm(a.firstName) == norm(b.firstName) &&
+        norm(a.lastName) == norm(b.lastName) &&
+        norm(a.middleInitial) == norm(b.middleInitial) &&
+        norm(a.rankAbbrev) == norm(b.rankAbbrev) &&
+        norm(a.unit) == norm(b.unit) &&
+        norm(a.mos) == norm(b.mos) &&
+        norm(a.payGrade) == norm(b.payGrade) &&
+        a.onProfile == b.onProfile &&
+        a.sex == b.sex &&
+        sameDate(a.birthdate, b.birthdate) &&
+        a.measurementSystem == b.measurementSystem &&
+        a.height == b.height &&
+        a.weight == b.weight &&
+        a.bodyFatPercent == b.bodyFatPercent;
+  }
+
+  DefaultProfileSettings _mergeProfilesPreferLocal(
+    DefaultProfileSettings local,
+    DefaultProfileSettings remote,
+  ) {
+    String? pickString(String? localValue, String? remoteValue) =>
+        _emptyToNull(localValue) ?? _emptyToNull(remoteValue);
+
+    return DefaultProfileSettings(
+      firstName: pickString(local.firstName, remote.firstName),
+      lastName: pickString(local.lastName, remote.lastName),
+      middleInitial: pickString(local.middleInitial, remote.middleInitial),
+      rankAbbrev: pickString(local.rankAbbrev, remote.rankAbbrev),
+      unit: pickString(local.unit, remote.unit),
+      mos: pickString(local.mos, remote.mos),
+      payGrade: pickString(local.payGrade, remote.payGrade),
+      onProfile: local.onProfile != DefaultProfileSettings.defaults.onProfile
+          ? local.onProfile
+          : remote.onProfile,
+      sex: local.sex ?? remote.sex,
+      birthdate: local.birthdate ?? remote.birthdate,
+      measurementSystem:
+          local.measurementSystem != DefaultProfileSettings.defaults.measurementSystem
+              ? local.measurementSystem
+              : remote.measurementSystem,
+      height: local.height ?? remote.height,
+      weight: local.weight ?? remote.weight,
+      bodyFatPercent: local.bodyFatPercent ?? remote.bodyFatPercent,
+    );
+  }
+
   Map<String, dynamic> _defaultProfileToMap(DefaultProfileSettings profile) {
     return {
       'firstName': profile.firstName,
@@ -1094,6 +1322,110 @@ class SettingsController extends Notifier<SettingsState> {
       'weight': profile.weight,
       'bodyFatPercent': profile.bodyFatPercent,
     };
+  }
+
+  Map<String, dynamic> _defaultProfileToMergeMap(DefaultProfileSettings profile) {
+    final data = <String, dynamic>{};
+
+    void setString(String key, String? value) {
+      final v = _emptyToNull(value);
+      if (v == null) return;
+      data[key] = v;
+    }
+
+    setString('firstName', profile.firstName);
+    setString('lastName', profile.lastName);
+    setString('middleInitial', profile.middleInitial);
+    setString('rankAbbrev', profile.rankAbbrev);
+    setString('unit', profile.unit);
+    setString('mos', profile.mos);
+    setString('payGrade', profile.payGrade);
+
+    if (profile.onProfile != DefaultProfileSettings.defaults.onProfile) {
+      data['onProfile'] = profile.onProfile;
+    }
+
+    if (profile.sex != null) {
+      data['sex'] = profile.sex!.name;
+    }
+
+    if (profile.birthdate != null) {
+      data['birthdate'] = Timestamp.fromDate(profile.birthdate!);
+    }
+
+    if (profile.measurementSystem !=
+        DefaultProfileSettings.defaults.measurementSystem) {
+      data['measurementSystem'] = profile.measurementSystem.name;
+    }
+
+    if (profile.height != null) {
+      data['height'] = profile.height;
+    }
+
+    if (profile.weight != null) {
+      data['weight'] = profile.weight;
+    }
+
+    if (profile.bodyFatPercent != null) {
+      data['bodyFatPercent'] = profile.bodyFatPercent;
+    }
+
+    return data;
+  }
+
+  Map<String, Object?> _defaultProfileDeltaPatch(
+    DefaultProfileSettings previous,
+    DefaultProfileSettings next,
+  ) {
+    final patch = <String, Object?>{};
+
+    void diffString(String key, String? prev, String? next) {
+      final p = _emptyToNull(prev);
+      final n = _emptyToNull(next);
+      if (p == n) return;
+      patch['defaultProfile.$key'] = n == null ? FieldValue.delete() : n;
+    }
+
+    void diffDouble(String key, double? prev, double? next) {
+      if (prev == next) return;
+      patch['defaultProfile.$key'] =
+          next == null ? FieldValue.delete() : next;
+    }
+
+    diffString('firstName', previous.firstName, next.firstName);
+    diffString('lastName', previous.lastName, next.lastName);
+    diffString('middleInitial', previous.middleInitial, next.middleInitial);
+    diffString('rankAbbrev', previous.rankAbbrev, next.rankAbbrev);
+    diffString('unit', previous.unit, next.unit);
+    diffString('mos', previous.mos, next.mos);
+    diffString('payGrade', previous.payGrade, next.payGrade);
+
+    if (previous.onProfile != next.onProfile) {
+      patch['defaultProfile.onProfile'] = next.onProfile;
+    }
+
+    if (previous.measurementSystem != next.measurementSystem) {
+      patch['defaultProfile.measurementSystem'] = next.measurementSystem.name;
+    }
+
+    if (previous.sex != next.sex) {
+      patch['defaultProfile.sex'] =
+          next.sex == null ? FieldValue.delete() : next.sex!.name;
+    }
+
+    final prevDob = previous.birthdate?.millisecondsSinceEpoch;
+    final nextDob = next.birthdate?.millisecondsSinceEpoch;
+    if (prevDob != nextDob) {
+      patch['defaultProfile.birthdate'] = next.birthdate == null
+          ? FieldValue.delete()
+          : Timestamp.fromDate(next.birthdate!);
+    }
+
+    diffDouble('height', previous.height, next.height);
+    diffDouble('weight', previous.weight, next.weight);
+    diffDouble('bodyFatPercent', previous.bodyFatPercent, next.bodyFatPercent);
+
+    return patch;
   }
 
   DefaultProfileSettings _defaultProfileFromMap(Map<String, dynamic> data) {

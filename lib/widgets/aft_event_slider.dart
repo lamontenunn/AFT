@@ -17,7 +17,6 @@ class _TickBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (thresholds == null) return const SizedBox.shrink();
-    final theme = Theme.of(context);
     final width = 220.0; // compact non-interactive bar width
     final height = 8.0;
 

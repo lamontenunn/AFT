@@ -16,8 +16,6 @@ class PlateMathChartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     final rows = <_ChartRow>[];
     for (int w = max; w >= min; w -= step) {
       final res = plateMath(targetTotalLbs: w, barLbs: bar);

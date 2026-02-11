@@ -62,7 +62,15 @@ void main() {
     expect(find.byType(SignInPage), findsOneWidget);
 
     final guestButton = find.text('Continue as Guest');
-    await tester.ensureVisible(guestButton);
+    await tester.scrollUntilVisible(
+      guestButton,
+      200,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(guestButton);
     await tester.pumpAndSettle();
 

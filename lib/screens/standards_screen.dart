@@ -6,7 +6,6 @@ import 'package:aft_firebase_app/features/standards/providers.dart';
 import 'package:aft_firebase_app/theme/army_colors.dart';
 import 'package:aft_firebase_app/features/standards/state/standards_scroll.dart';
 import 'package:aft_firebase_app/features/standards/combat_info_dialog.dart';
-import 'dart:ui' show FontFeature;
 
 /// Standards screen:
 /// - Top pinned controls: Gender, Combat, Age Band, ALT Event (Off)
@@ -27,8 +26,9 @@ class _StandardsScreenState extends ConsumerState<StandardsScreen> {
     final initial = ref.read(standardsScrollOffsetProvider);
     _controller = ScrollController(initialScrollOffset: initial);
     _controller.addListener(() {
-      ref.read(standardsScrollOffsetProvider.notifier).state =
-          _controller.offset;
+      ref
+          .read(standardsScrollOffsetProvider.notifier)
+          .setOffset(_controller.offset);
     });
   }
 
@@ -311,7 +311,6 @@ class _HeaderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Material(
       color: ArmyColors.gold,
       child: Container(
@@ -440,7 +439,6 @@ class _HeaderCell extends StatelessWidget {
   final String text;
   final TextAlign align;
   const _HeaderCell({
-    super.key,
     required this.width,
     required this.text,
     this.align = TextAlign.right,
@@ -479,7 +477,6 @@ class _DataCell extends StatelessWidget {
   final double height;
 
   const _DataCell({
-    super.key,
     required this.width,
     required this.text,
     this.align = TextAlign.right,
@@ -517,7 +514,7 @@ class _DataCell extends StatelessWidget {
 }
 
 class _Sep extends StatelessWidget {
-  const _Sep({super.key});
+  const _Sep();
 
   @override
   Widget build(BuildContext context) {

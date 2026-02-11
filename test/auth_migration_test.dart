@@ -49,25 +49,22 @@ void main() {
   });
 
   test('Auth transition triggers migration exactly once', () async {
-    final controller = FakeAuthController();
+    final anon = buildMockUser(uid: 'anon1', isAnonymous: true);
+    final user = buildMockUser(uid: 'userA', isAnonymous: false);
+    final userStream = Stream<User?>.fromIterable([anon, user]);
     final spy = GuestMigrationSpy();
     final container = ProviderContainer(
       overrides: [
-        firebaseAuthProvider.overrideWithValue(controller.auth),
+        firebaseUserProvider.overrideWith((ref) => userStream),
         guestMigrationProvider.overrideWithValue(spy),
       ],
     );
-    addTearDown(container.dispose);
-    addTearDown(controller.dispose);
+    final sub = container.listen(authSideEffectsProvider, (_, __) {});
+    addTearDown(() {
+      sub.close();
+      container.dispose();
+    });
 
-    container.read(authSideEffectsProvider);
-
-    final anon = buildMockUser(uid: 'anon1', isAnonymous: true);
-    final user = buildMockUser(uid: 'userA', isAnonymous: false);
-
-    controller.emit(anon);
-    await Future<void>.delayed(Duration.zero);
-    controller.emit(user);
     await Future<void>.delayed(Duration.zero);
 
     expect(spy.trackedUids, contains('anon1'));
@@ -93,9 +90,17 @@ void main() {
     );
 
     final guestButton = find.text('Continue as Guest');
-    await tester.ensureVisible(guestButton);
+    await tester.scrollUntilVisible(
+      guestButton,
+      200,
+      scrollable: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(guestButton);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(spy.trackedUids, ['anon42']);
   });
