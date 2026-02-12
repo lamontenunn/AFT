@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 class PasswordResetLinks {
   // Universal link domain for reset flows.
   static const String appLinkDomain = 'https://links.nunntechnologies.com';
-  static const String resetPath = '/reset';
+  static const String resetPath = '/reset/';
   static const String androidPackageName = 'com.lamontenunn.aftpro';
   static const String androidMinimumVersion = '1';
   static const String iosBundleId = 'com.lamontenunn.aftpro';
@@ -32,18 +32,43 @@ class PasswordResetLinks {
   }
 
   static String? extractOobCode(Uri link) {
-    Uri target = link;
-    final embedded = link.queryParameters['link'];
-    if (embedded != null) {
-      final decoded = Uri.decodeFull(embedded);
-      final parsed = Uri.tryParse(decoded);
-      if (parsed != null) {
-        target = parsed;
+    Uri? target = link;
+    final visited = <String>{};
+
+    while (target != null) {
+      final mode = target.queryParameters['mode'];
+      final code = target.queryParameters['oobCode'];
+      if (code != null && code.isNotEmpty) {
+        // Some wrapped link formats omit `mode` after URL rewrites.
+        if (mode == null || mode == 'resetPassword') {
+          return code;
+        }
       }
+
+      final embedded = target.queryParameters['link'] ??
+          target.queryParameters['deep_link_id'];
+      if (embedded == null || embedded.isEmpty) break;
+      final parsed = _parseEmbeddedUri(embedded, visited);
+      if (parsed == null) break;
+      target = parsed;
     }
 
-    final mode = target.queryParameters['mode'];
-    if (mode != 'resetPassword') return null;
-    return target.queryParameters['oobCode'];
+    return null;
+  }
+
+  static Uri? _parseEmbeddedUri(String raw, Set<String> visited) {
+    if (raw.isEmpty) return null;
+    if (!visited.add(raw)) return null;
+
+    final direct = Uri.tryParse(raw);
+    if (direct != null) return direct;
+
+    try {
+      final decoded = Uri.decodeComponent(raw);
+      if (!visited.add(decoded)) return null;
+      return Uri.tryParse(decoded);
+    } catch (_) {
+      return null;
+    }
   }
 }

@@ -21,26 +21,27 @@ class Routes {
 
 class AppRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
-    final name = settings.name;
-    if (name != null) {
-      final uri = Uri.tryParse(name);
+    var routeName = settings.name;
+    if (routeName != null) {
+      final uri = Uri.tryParse(routeName);
       if (uri != null) {
-        final isResetPath =
-            uri.path == PasswordResetLinks.resetPath ||
-            uri.path.startsWith('/__/auth/');
-        if (isResetPath) {
-          final code = PasswordResetLinks.extractOobCode(uri);
-          if (code != null) {
-            return MaterialPageRoute(
-              settings: settings,
-              builder: (context) => ResetPasswordScreen(oobCode: code),
-            );
-          }
+        // Handle Firebase email action links regardless of incoming path shape.
+        final code = PasswordResetLinks.extractOobCode(uri);
+        if (code != null) {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (context) => ResetPasswordScreen(oobCode: code),
+          );
+        }
+
+        // Normalize URL-like route names to path-only names.
+        if (uri.path.isNotEmpty) {
+          routeName = uri.path;
         }
       }
     }
 
-    switch (settings.name) {
+    switch (routeName) {
       case Routes.home:
         return PageRouteBuilder(
           settings: settings,

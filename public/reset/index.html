@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Reset your AFT Pro password">
+    <title>Reset Password | AFT Pro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <style>
+      :root {
+        --bg: #0b0f1a;
+        --bg-alt: #131b31;
+        --panel: rgba(14, 22, 38, 0.9);
+        --line: rgba(255, 255, 255, 0.14);
+        --text: #f4f7ff;
+        --muted: #b1bbd0;
+        --accent: #f3c632;
+        --accent-ink: #2d2508;
+        --danger: #ff7d8f;
+        --ok: #7dd3a6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(900px 450px at 12% -10%, rgba(243, 198, 50, 0.22), transparent 58%),
+          radial-gradient(900px 500px at 90% 0%, rgba(70, 115, 255, 0.2), transparent 53%),
+          linear-gradient(160deg, var(--bg), var(--bg-alt));
+        display: grid;
+        place-items: center;
+        padding: 22px;
+      }
+
+      .wrap {
+        width: min(560px, 100%);
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
+          var(--panel);
+        backdrop-filter: blur(8px);
+        padding: clamp(20px, 4vw, 30px);
+        box-shadow: 0 18px 60px rgba(4, 8, 16, 0.48);
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        font-family: "Space Grotesk", sans-serif;
+        font-weight: 700;
+      }
+
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: clamp(1.5rem, 4.8vw, 2.1rem);
+      }
+
+      .lead {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .status {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(18, 27, 45, 0.8);
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .status.error {
+        border-color: rgba(255, 125, 143, 0.44);
+        color: #ffd2d9;
+        background: rgba(80, 20, 32, 0.45);
+      }
+
+      .status.success {
+        border-color: rgba(125, 211, 166, 0.48);
+        color: #d7f8e7;
+        background: rgba(20, 66, 46, 0.45);
+      }
+
+      form {
+        margin-top: 18px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      label {
+        font-size: 0.93rem;
+        font-weight: 600;
+      }
+
+      input {
+        width: 100%;
+        min-height: 46px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(12, 18, 31, 0.92);
+        color: var(--text);
+        font: inherit;
+        padding: 0 12px;
+      }
+
+      input:focus {
+        outline: 2px solid rgba(243, 198, 50, 0.6);
+        outline-offset: 1px;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      button,
+      .link-btn {
+        min-height: 44px;
+        border-radius: 999px;
+        padding: 0 16px;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+
+      button[disabled] {
+        cursor: not-allowed;
+        opacity: 0.65;
+      }
+
+      .link-btn {
+        border: 1px solid var(--line);
+        color: var(--text);
+        background: transparent;
+      }
+
+      .meta {
+        margin-top: 16px;
+        font-size: 0.86rem;
+        color: var(--muted);
+      }
+
+      .meta a {
+        color: var(--text);
+      }
+
+      @media (max-width: 560px) {
+        .row {
+          flex-direction: column;
+        }
+
+        button,
+        .link-btn {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card" aria-labelledby="title">
+        <div class="brand" aria-label="AFT Pro">
+          <div class="brand-mark">AFT</div>
+          <span>AFT Pro</span>
+        </div>
+
+        <h1 id="title">Reset your password</h1>
+        <p class="lead">
+          Choose a new password for your AFT Pro account. This page works for reset links opened from email.
+        </p>
+
+        <div id="status" class="status" role="status" aria-live="polite">
+          Validating your reset link...
+        </div>
+
+        <form id="reset-form" hidden novalidate>
+          <div class="field">
+            <label for="password">New password</label>
+            <input id="password" type="password" minlength="6" autocomplete="new-password" required>
+          </div>
+
+          <div class="field">
+            <label for="confirm-password">Confirm new password</label>
+            <input id="confirm-password" type="password" minlength="6" autocomplete="new-password" required>
+          </div>
+
+          <div class="row">
+            <button id="submit-btn" type="submit">Update password</button>
+            <a class="link-btn" href="/">Back to home</a>
+          </div>
+        </form>
+
+        <div class="meta">
+          Need help? Open the AFT Pro app and use support options in Settings.
+          Privacy policy: <a href="/privacy/">/privacy/</a>
+        </div>
+      </section>
+    </main>
+
+    <script defer src="/__/firebase/12.7.0/firebase-app-compat.js"></script>
+    <script defer src="/__/firebase/12.7.0/firebase-auth-compat.js"></script>
+    <script defer src="/__/firebase/init.js"></script>
+    <script>
+      (function () {
+        function setStatus(message, tone) {
+          const status = document.getElementById('status');
+          status.textContent = message;
+          status.className = 'status';
+          if (tone) {
+            status.classList.add(tone);
+          }
+        }
+
+        function extractActionData(startUrl) {
+          const visited = new Set();
+          let current = startUrl;
+
+          while (current) {
+            const mode = current.searchParams.get('mode');
+            const code = current.searchParams.get('oobCode');
+            if (code) {
+              return { mode: mode || '', oobCode: code };
+            }
+
+            const embedded =
+              current.searchParams.get('link') ||
+              current.searchParams.get('deep_link_id') ||
+              current.searchParams.get('continueUrl') ||
+              current.searchParams.get('continue_url') ||
+              current.searchParams.get('url');
+            if (!embedded) break;
+
+            const next = parseEmbeddedUrl(embedded, visited);
+            if (!next) break;
+            current = next;
+          }
+
+          return { mode: '', oobCode: '' };
+        }
+
+        function parseEmbeddedUrl(raw, visited) {
+          if (!raw || visited.has(raw)) return null;
+          visited.add(raw);
+
+          try {
+            return new URL(raw);
+          } catch (_) {
+            try {
+              const decoded = decodeURIComponent(raw);
+              if (!decoded || visited.has(decoded)) return null;
+              visited.add(decoded);
+              return new URL(decoded);
+            } catch (_) {
+              return null;
+            }
+          }
+        }
+
+        function validateNewPassword(password, confirmPassword) {
+          if (!password || password.length < 6) {
+            return 'Password must be at least 6 characters.';
+          }
+          if (password !== confirmPassword) {
+            return 'Passwords do not match.';
+          }
+          return '';
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+          const form = document.getElementById('reset-form');
+          const submitButton = document.getElementById('submit-btn');
+          const passwordInput = document.getElementById('password');
+          const confirmInput = document.getElementById('confirm-password');
+
+          try {
+            if (!window.firebase || !firebase.apps || firebase.apps.length === 0) {
+              setStatus('Unable to initialize reset flow. Please try again from the latest reset email.', 'error');
+              return;
+            }
+
+            const auth = firebase.auth();
+            const { mode, oobCode } = extractActionData(new URL(window.location.href));
+
+            if (!oobCode) {
+              setStatus('Invalid or expired reset link. Request a new password reset from the app.', 'error');
+              return;
+            }
+
+            if (mode && mode !== 'resetPassword') {
+              setStatus('This link is not a password reset link. Request a new reset email.', 'error');
+              return;
+            }
+
+            let accountEmail = '';
+            try {
+              accountEmail = await auth.verifyPasswordResetCode(oobCode);
+            } catch (error) {
+              const code = error && error.code ? String(error.code) : '';
+              const message = code === 'auth/expired-action-code' || code === 'auth/invalid-action-code'
+                ? 'This reset link is expired or has already been used. Request a new one from the app.'
+                : 'Unable to verify this reset link. Request a new password reset email.';
+              setStatus(message, 'error');
+              return;
+            }
+
+            setStatus(
+              accountEmail
+                ? 'Reset link verified for ' + accountEmail + '. Enter your new password below.'
+                : 'Reset link verified. Enter your new password below.',
+              ''
+            );
+            form.hidden = false;
+
+            form.addEventListener('submit', async function (event) {
+              event.preventDefault();
+
+              const password = passwordInput.value;
+              const confirmPassword = confirmInput.value;
+              const validationError = validateNewPassword(password, confirmPassword);
+              if (validationError) {
+                setStatus(validationError, 'error');
+                return;
+              }
+
+              submitButton.disabled = true;
+              setStatus('Updating password...', '');
+
+              try {
+                await auth.confirmPasswordReset(oobCode, password);
+                form.hidden = true;
+                setStatus(
+                  'Password updated successfully. Return to AFT Pro and sign in with your new password.',
+                  'success'
+                );
+              } catch (error) {
+                const code = error && error.code ? String(error.code) : '';
+                const message = code === 'auth/weak-password'
+                  ? 'Password is too weak. Use at least 6 characters.'
+                  : code === 'auth/expired-action-code' || code === 'auth/invalid-action-code'
+                    ? 'This reset link is no longer valid. Request a new one from the app.'
+                    : 'Failed to update password. Please try again.';
+                setStatus(message, 'error');
+                submitButton.disabled = false;
+              }
+            });
+          } catch (_) {
+            setStatus('Something went wrong loading this page. Please request a new reset email.', 'error');
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

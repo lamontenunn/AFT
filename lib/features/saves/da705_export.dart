@@ -210,7 +210,7 @@ Future<File> _writePdfToDocuments(Uint8List bytes, ScoreSet set) async {
 Future<void> _showSavedLocationDialog(BuildContext context, File file) async {
   final isIos = Platform.isIOS;
   final hint = isIos
-      ? 'Files > On My iPhone > Aft Firebase App'
+      ? 'Files > On My iPhone > Aft Pro'
       : 'Files > Internal storage > Android/data/<app>/files';
   await showDialog<void>(
     context: context,

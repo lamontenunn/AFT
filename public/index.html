@@ -1,89 +1,387 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
+    <meta
+      name="description"
+      content="Most up-to-date AFT calculator"
+    >
+    <title>AFT Pro | Army Fitness Test Toolkit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <style>
+      :root {
+        --bg: #0b0f19;
+        --bg-alt: #151b2d;
+        --panel: rgba(14, 20, 34, 0.84);
+        --panel-strong: rgba(19, 26, 44, 0.94);
+        --text: #f5f7ff;
+        --muted: #afb8cc;
+        --line: rgba(255, 255, 255, 0.14);
+        --accent: #f3c632;
+        --accent-ink: #2d2508;
+        --ok: #8fe3b1;
+        --radius-lg: 24px;
+        --radius-md: 16px;
+        --radius-sm: 12px;
+        --max: 1080px;
+      }
 
-    <!-- update the version number as needed -->
-    <script defer src="/__/firebase/12.7.0/firebase-app-compat.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/12.7.0/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-database-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-messaging-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-storage-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-analytics-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-remote-config-compat.js"></script>
-    <script defer src="/__/firebase/12.7.0/firebase-performance-compat.js"></script>
-    <!-- 
-      initialize the SDK after all desired features are loaded, set useEmulator to false
-      to avoid connecting the SDK to running emulators.
-    -->
-    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+      * {
+        box-sizing: border-box;
+      }
 
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1000px 500px at 8% -15%, rgba(243, 198, 50, 0.22), transparent 58%),
+          radial-gradient(900px 500px at 95% 0%, rgba(82, 114, 255, 0.2), transparent 52%),
+          linear-gradient(165deg, var(--bg) 0%, var(--bg-alt) 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        opacity: 0.35;
+      }
+
+      .shell {
+        position: relative;
+        z-index: 1;
+        width: min(var(--max), calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 24px 0 10px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: "Space Grotesk", sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+      }
+
+      .brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .top-links {
+        display: flex;
+        gap: 16px;
+      }
+
+      .top-links a {
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.92rem;
+      }
+
+      .top-links a:hover {
+        color: var(--text);
+      }
+
+      .hero {
+        margin-top: 12px;
+        padding: clamp(24px, 4vw, 42px);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
+          var(--panel-strong);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 18px 60px rgba(5, 8, 15, 0.5);
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--ok);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 0.74rem;
+      }
+
+      h1 {
+        margin: 14px 0 12px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: clamp(1.9rem, 5.2vw, 3.3rem);
+        line-height: 1.08;
+      }
+
+      .lead {
+        margin: 0;
+        max-width: 62ch;
+        color: var(--muted);
+        font-size: clamp(1rem, 2.6vw, 1.15rem);
+        line-height: 1.6;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.94rem;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+
+      .btn-secondary {
+        border: 1px solid var(--line);
+        color: var(--text);
+        background: transparent;
+      }
+
+      .stats {
+        margin-top: 26px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        padding: 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(12, 18, 31, 0.7);
+      }
+
+      .stat strong {
+        display: block;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.1rem;
+        margin-bottom: 5px;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .features {
+        margin: 24px 0;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .feature {
+        border-radius: var(--radius-md);
+        border: 1px solid var(--line);
+        background: var(--panel);
+        padding: 18px;
+      }
+
+      .feature h2 {
+        margin: 0 0 8px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.08rem;
+      }
+
+      .feature p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.55;
+        font-size: 0.95rem;
+      }
+
+      .trust {
+        margin-bottom: 30px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--panel);
+        padding: 18px;
+      }
+
+      .trust h2 {
+        margin: 0 0 10px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 1.08rem;
+      }
+
+      .trust ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid rgba(255, 255, 255, 0.11);
+        padding: 20px 0 30px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      footer a {
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      @media (max-width: 900px) {
+        .stats,
+        .features {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .topbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+
+        .top-links {
+          gap: 12px;
+        }
+
+        footer {
+          flex-direction: column;
+          align-items: flex-start;
+        }
       }
     </style>
   </head>
   <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">AFT</div>
+          <span>AFT Pro</span>
+        </div>
+        <nav class="top-links" aria-label="Primary">
+          <a href="#features">Features</a>
+          <a href="/privacy/">Privacy</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <p class="eyebrow">Army Fitness Test Toolkit</p>
+          <h1 id="hero-title">Most up-to-date AFT calculator</h1>
+          <p class="lead">
+            AFT Pro gives Soldiers and leaders a fast way to score events,
+            check standards, save test sets, and export DA Form 705 PDFs.
+            Use it in guest mode on one device or sign in to sync data across devices.
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="/privacy/">Read Privacy Policy</a>
+            <a class="btn btn-secondary" href="#features">Explore Features</a>
+          </div>
+
+          <div class="stats" aria-label="Highlights">
+            <div class="stat">
+              <strong>Live Scoring</strong>
+              <span>Instant event and total score calculation.</span>
+            </div>
+            <div class="stat">
+              <strong>Standards Lookup</strong>
+              <span>Quick male/female and general/combat references.</span>
+            </div>
+            <div class="stat">
+              <strong>DA Form 705 Export</strong>
+              <span>Generate and share printable PDF records.</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="features" class="features" aria-label="Feature cards">
+          <article class="feature">
+            <h2>Built For Daily Use</h2>
+            <p>
+              Designed for quick data entry and clear readability so users can
+              score training and diagnostics without slowing down.
+            </p>
+          </article>
+          <article class="feature">
+            <h2>Flexible Data Modes</h2>
+            <p>
+              Stay local in guest mode, or sign in to keep your score history
+              and profile synced in the cloud.
+            </p>
+          </article>
+          <article class="feature">
+            <h2>Account Controls</h2>
+            <p>
+              Built-in support and account-management flows include in-app
+              account deletion and cloud data cleanup.
+            </p>
+          </article>
+        </section>
+
+        <section class="trust" aria-label="Legal and trust note">
+          <h2>Important</h2>
+          <ul>
+            <li>AFT Pro is built by Nunn Technologies.</li>
+            <li>Not affiliated with or endorsed by the U.S. Army.</li>
+            <li>Review the full policy details at <a href="/privacy/">/privacy/</a>.</li>
+          </ul>
+        </section>
+      </main>
+
+      <footer>
+        <span>© <span id="year"></span> AFT Pro</span>
+        <a href="/privacy/">Privacy Policy</a>
+      </footer>
     </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
 
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const loadEl = document.querySelector('#load');
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.firestore().doc('/foo/bar').get().then(() => { });
-        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        // firebase.analytics(); // call to activate
-        // firebase.analytics().logEvent('tutorial_completed');
-        // firebase.performance(); // call to activate
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-
-        try {
-          let app = firebase.app();
-          let features = [
-            'auth', 
-            'database', 
-            'firestore',
-            'functions',
-            'messaging', 
-            'storage', 
-            'analytics', 
-            'remoteConfig',
-            'performance',
-          ].filter(feature => typeof app[feature] === 'function');
-          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
-        } catch (e) {
-          console.error(e);
-          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
-        }
-      });
+      document.getElementById("year").textContent = new Date().getFullYear();
     </script>
   </body>
 </html>

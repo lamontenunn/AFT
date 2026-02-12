@@ -230,7 +230,7 @@ class _ProctorScreenState extends ConsumerState<ProctorScreen> {
                   const Text('No participant selected'),
                   const SizedBox(height: 6),
                   Text(
-                    'Tap the roster chip to add/select a participant.',
+                    'Tap the \'+\' chip to add/select a participant.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
@@ -271,7 +271,7 @@ class _ProctorScreenState extends ConsumerState<ProctorScreen> {
               children: [
                 ListTile(
                   leading: const Icon(Icons.group_outlined),
-                  title: const Text('Roster'),
+                  title: const Text('Participants'),
                   subtitle: Text(
                       '${session.roster.length} participant${session.roster.length == 1 ? '' : 's'}'),
                   trailing: FilledButton.icon(
@@ -559,7 +559,7 @@ class _RosterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = selected == null
-        ? (rosterCount == 0 ? 'Roster' : 'Roster ($rosterCount)')
+        ? (rosterCount == 0 ? '+' : 'Soldiers ($rosterCount)')
         : (selected!.name?.trim().isNotEmpty == true
             ? selected!.name!.trim()
             : 'Participant');

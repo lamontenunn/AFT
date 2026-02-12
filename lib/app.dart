@@ -78,7 +78,7 @@ class _AppState extends ConsumerState<App> {
     final settings = ref.watch(settingsProvider);
 
     return MaterialApp(
-      title: 'AFT Firebase Demo',
+      title: 'AFT Pro',
       debugShowCheckedModeBanner: false,
       theme: ArmyTheme.light,
       darkTheme: ArmyTheme.dark,

@@ -17,6 +17,16 @@ class _HeightWeightChartScreenState extends State<HeightWeightChartScreen> {
   Widget build(BuildContext context) {
     final rows = _rowsFor(_sex);
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final headingColor = Color.alphaBlend(
+      cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.08),
+      cs.surface,
+    );
+    final oddRowColor = Color.alphaBlend(
+      cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.04),
+      cs.surface,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -60,11 +70,10 @@ class _HeightWeightChartScreenState extends State<HeightWeightChartScreen> {
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                     headingRowHeight: 36,
-                    headingRowColor: MaterialStateProperty.all(
-                      theme.colorScheme.surfaceVariant.withOpacity(0.6),
-                    ),
+                    headingRowColor: WidgetStatePropertyAll(headingColor),
                     dataRowMinHeight: 34,
                     dataRowMaxHeight: 42,
+                    dividerThickness: 0.5,
                     columns: const [
                       DataColumn(label: Text('Height (in)')),
                       DataColumn(label: Text('Min wt')),
@@ -76,14 +85,13 @@ class _HeightWeightChartScreenState extends State<HeightWeightChartScreen> {
                     rows: [
                       for (final entry in rows.asMap().entries)
                         DataRow(
-                          color: MaterialStateProperty.resolveWith((states) {
-                            if (states.contains(MaterialState.selected)) {
-                              return theme.colorScheme.primary.withOpacity(0.12);
+                          color: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return cs.primary.withValues(alpha: 0.18);
                             }
                             return entry.key.isEven
-                                ? theme.colorScheme.surface
-                                : theme.colorScheme.surfaceVariant
-                                    .withOpacity(0.35);
+                                ? cs.surface
+                                : oddRowColor;
                           }),
                           onSelectChanged: (_) =>
                               _showRowDetails(context, entry.value),

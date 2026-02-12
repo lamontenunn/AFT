@@ -94,6 +94,22 @@
     ],
     "rewrites": [
       {
+        "source": "/privacy",
+        "destination": "/privacy/index.html"
+      },
+      {
+        "source": "/privacy/**",
+        "destination": "/privacy/index.html"
+      },
+      {
+        "source": "/reset",
+        "destination": "/reset/index.html"
+      },
+      {
+        "source": "/reset/**",
+        "destination": "/reset/index.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
