@@ -497,9 +497,16 @@ class SettingsController extends Notifier<SettingsState> {
         if (_activeUserId != uid || !snapshot.exists) return;
         final data = snapshot.data();
         if (data == null) return;
-        _lastProfileSyncError = null;
+        final hadSyncError = _lastProfileSyncError != null;
         _resetProfileSyncRetry();
-        _applyRemoteProfile(data);
+        unawaited(
+          _applyRemoteProfile(
+            data,
+            fromServer: !snapshot.metadata.isFromCache,
+            hasPendingWrites: snapshot.metadata.hasPendingWrites,
+            hadSyncError: hadSyncError,
+          ),
+        );
       },
       onError: (Object error, StackTrace stack) {
         if (!ref.mounted) return;
@@ -604,19 +611,31 @@ class SettingsController extends Notifier<SettingsState> {
     // Safety: never overwrite a non-empty remote profile with an empty local one.
     // This can happen if local prefs are cleared/mismatched or device time is skewed.
     if (remoteHasData && !localHasData) {
-      await _applyRemoteProfile(data);
+      await _applyRemoteProfile(
+        data,
+        fromServer: !doc.metadata.isFromCache,
+        hasPendingWrites: doc.metadata.hasPendingWrites,
+      );
       return;
     }
 
     if (localUpdatedAt == 0) {
       if (remoteHasData) {
-        await _applyRemoteProfile(data);
+        await _applyRemoteProfile(
+          data,
+          fromServer: !doc.metadata.isFromCache,
+          hasPendingWrites: doc.metadata.hasPendingWrites,
+        );
       }
       return;
     }
 
     if (remoteUpdatedAt > localUpdatedAt) {
-      await _applyRemoteProfile(data);
+      await _applyRemoteProfile(
+        data,
+        fromServer: !doc.metadata.isFromCache,
+        hasPendingWrites: doc.metadata.hasPendingWrites,
+      );
       return;
     }
 
@@ -638,7 +657,12 @@ class SettingsController extends Notifier<SettingsState> {
     }
   }
 
-  Future<void> _applyRemoteProfile(Map<String, dynamic> data) async {
+  Future<void> _applyRemoteProfile(
+    Map<String, dynamic> data, {
+    bool fromServer = false,
+    bool hasPendingWrites = false,
+    bool hadSyncError = false,
+  }) async {
     if (!ref.mounted) return;
     final profileRaw = data['defaultProfile'];
     if (profileRaw == null) return;
@@ -652,8 +676,36 @@ class SettingsController extends Notifier<SettingsState> {
     final localUpdatedAt = prefs.getInt(_scopedKey(_kDpUpdatedAt, scope)) ?? 0;
     if (updatedAt.millisecondsSinceEpoch <= localUpdatedAt) {
       final localProfile = state.defaultProfile;
+      if (_profilesEqual(profile, localProfile)) {
+        _lastProfileSyncError = null;
+        return;
+      }
+
+      // Firestore console edits may update defaultProfile without touching updatedAt.
+      // For authoritative server snapshots (not cache/pending writes), accept that
+      // remote payload even when the timestamp does not advance.
+      final canAcceptStaleRemote = fromServer && !hasPendingWrites && !hadSyncError;
+      if (canAcceptStaleRemote) {
+        final appliedAtMillis = updatedAt.millisecondsSinceEpoch > localUpdatedAt
+            ? updatedAt.millisecondsSinceEpoch
+            : localUpdatedAt;
+        _isApplyingRemote = true;
+        try {
+          await setDefaultProfile(
+            profile,
+            updatedAt: DateTime.fromMillisecondsSinceEpoch(appliedAtMillis),
+            syncRemote: false,
+          );
+          _lastProfileSyncError = null;
+        } finally {
+          _isApplyingRemote = false;
+        }
+        return;
+      }
+
       final merged = _mergeProfilesPreferLocal(localProfile, profile);
       if (_profilesEqual(merged, localProfile)) {
+        _lastProfileSyncError = null;
         return;
       }
       _isApplyingRemote = true;
@@ -663,6 +715,7 @@ class SettingsController extends Notifier<SettingsState> {
           updatedAt: DateTime.fromMillisecondsSinceEpoch(localUpdatedAt),
           syncRemote: false,
         );
+        _lastProfileSyncError = null;
       } finally {
         _isApplyingRemote = false;
       }
@@ -676,6 +729,7 @@ class SettingsController extends Notifier<SettingsState> {
         updatedAt: updatedAt,
         syncRemote: false,
       );
+      _lastProfileSyncError = null;
     } finally {
       _isApplyingRemote = false;
     }
