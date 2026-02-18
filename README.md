@@ -1,3 +1,9 @@
+
+<img width="370" height="800" alt="400x800bb" src="https://github.com/user-attachments/assets/67265d5b-b2e3-439e-a81c-3e5f229c60e1" />
+
+<img width="370" height="800" alt="400x800bb-1" src="https://github.com/user-attachments/assets/e2865863-b189-44ef-a6ed-857a9986082d" />
+
+
 # AFT – Internal Developer README (Flutter + Firebase)
 
 This repo contains a multi-platform Flutter app for Army Fitness Test (AFT) scoring and proctoring utilities.
